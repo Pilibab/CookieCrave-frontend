@@ -1,15 +1,6 @@
-import Link from 'next/link';
+import { redirect } from "next/navigation";
 
-export default function Home() {
-  return (
-    <div className="main-container">
-      <h1>Hello world</h1>
-      <ul>
-        <li>
-          <Link href="/order">Order Now</Link>
-        </li>
-        <li>Contact us</li>
-      </ul>
-    </div>
-  );
+export default function RootPage() {
+  // Middleware handles auth redirect; this is a fallback
+  redirect("/dashboard");
 }

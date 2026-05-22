@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CookieKrave — Frontend
 
-## Getting Started
+Next.js 15 app for the CookieKrave Order Management System.
 
-First, run the development server:
+## Stack
+- **Next.js 15** (App Router)
+- **TypeScript**
+- **Custom CSS** (no UI library — plain class-based styles in `globals.css`)
+- **Google OAuth** (handled by the backend; frontend just redirects to `/api/auth/google`)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Structure
+
+```
+src/
+├── app/
+│   ├── auth/login/          # Login page (Google sign-in)
+│   ├── dashboard/           # Dashboard home (metrics, pending orders, low stock)
+│   ├── orders/              # Order list, detail view, new order form
+│   │   ├── [id]/            # Order detail + status stepper
+│   │   └── new/             # Place a new order
+│   ├── products/            # Product CRUD
+│   ├── inventory/           # Ingredient stock management
+│   ├── customers/           # Customer directory
+│   └── reports/             # Weekly profit & order-by-status report
+├── components/
+│   └── layout/Sidebar.tsx   # Navigation sidebar
+├── hooks/
+│   ├── useAuth.tsx          # Auth context + hook
+│   └── useFetch.ts          # Generic fetch + mutation hooks
+├── lib/
+│   └── api.ts               # All backend API calls (REST)
+├── types/
+│   └── index.ts             # TypeScript types mirroring the DB schema
+└── middleware.ts             # Route protection (redirect to /auth/login if no session)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Pages & Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Page | Path | Features |
+|------|------|---------|
+| Login | `/auth/login` | Google OAuth button → backend redirect |
+| Dashboard | `/dashboard` | Order window status, metric cards, pending orders table, low stock alerts |
+| Orders | `/orders` | Filterable list by status, pagination |
+| Order Detail | `/orders/[id]` | Status stepper (Pending → Confirmed → Baking → Out for Delivery → For Pickup → Completed → Cancel), customer & fulfillment info, itemized invoice |
+| New Order | `/orders/new` | Customer picker, product grid with qty controls, fulfillment (Delivery / Pick Up), payment method, live order summary |
+| Products | `/products` | Table with availability toggle, add/edit modal |
+| Inventory | `/inventory` | Stock levels with low-stock highlight, add/edit modal |
+| Customers | `/customers` | Directory with pagination, add modal |
+| Reports | `/reports` | Week picker, revenue + order count cards, status breakdown bar chart, print |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Setup
 
-## Learn More
+```bash
+# Install dependencies
+npm install
 
-To learn more about Next.js, take a look at the following resources:
+# Copy env and set your backend URL
+cp .env.example .env.local
+# NEXT_PUBLIC_API_URL=http://localhost:3001/api
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Run dev server
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Environment Variables
 
-## Deploy on Vercel
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_API_URL` | Base URL of the Express backend (default: `http://localhost:3001/api`) |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Backend Contract (expected API endpoints)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The `src/lib/api.ts` file documents every endpoint the frontend calls.
+Key ones the backend must implement:
+
+- `GET  /api/auth/me` — returns `{ user }` from session
+- `GET  /api/auth/google` — initiates Google OAuth flow
+- `GET  /api/auth/google/callback` — OAuth callback, sets session, redirects to `/dashboard`
+- `POST /api/auth/logout` — destroys session
+- `GET/POST /api/customers`
+- `GET/PUT /api/customers/:id`
+- `GET/POST /api/products`
+- `GET/PUT /api/products/:id`
+- `GET /api/products/:id/bom`
+- `GET/POST /api/orders?page&limit&status`
+- `GET /api/orders/:id`
+- `POST /api/orders`
+- `PATCH /api/orders/:id/status`
+- `GET/POST /api/inventory`
+- `GET/PUT /api/inventory/:id`
+- `GET /api/inventory/low-stock`
+- `POST /api/fulfillment`
+- `GET /api/riders`
+- `GET /api/reports/weekly?week_start=YYYY-MM-DD`
+- `GET /api/reports/orders-by-status`
