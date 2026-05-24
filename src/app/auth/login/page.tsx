@@ -1,11 +1,22 @@
+// auth/login/page.tsx
 "use client";
+import { createClient } from '@supabase/supabase-js'; // Or your custom supabase instance
 
-import { authApi } from "@/lib/api";
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!, 
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function LoginPage() {
-  const handleGoogleLogin = () => {
-    window.location.href = authApi.googleLoginUrl;
-  };
+  const handleGoogleLogin = async () => {
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          // Once authorized, Google will drop the user off at this loading pipeline route
+          redirectTo: 'http://localhost:3000/auth/callback-loading', 
+        },
+      });
+    };
 
   return (
     <div style={styles.page}>
@@ -38,6 +49,7 @@ export default function LoginPage() {
   );
 }
 
+// ! POTA HHAHAHAHHAHA
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18">
