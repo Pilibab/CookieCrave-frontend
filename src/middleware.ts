@@ -1,26 +1,34 @@
+// frontend/src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/auth/login"];
-
 export function middleware(request: NextRequest) {
+  const token = request.cookies.get("sb-access-token")?.value;
   const { pathname } = request.nextUrl;
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
-  // The backend sets a session cookie — check for its presence
-  const hasSession = request.cookies.has("connect.sid") || request.cookies.has("session");
+  // Protect internal back-office routes
+  const isInternalRoute = 
+    pathname.startsWith("/dashboard") || 
+    pathname.startsWith("/inventory") || 
+    pathname.startsWith("/orders") || 
+    pathname.startsWith("/reports") || 
+    pathname.startsWith("/admin");
 
-  if (!isPublic && !hasSession) {
+  if (isInternalRoute && !token) {
+    // No token? Boot them back to login
     return NextResponse.redirect(new URL("/auth/login", request.url));
-  }
-
-  if (isPublic && hasSession) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return NextResponse.next();
 }
 
+// Ensure middleware doesn't trigger on assets or the root route unnecessarily
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api).*)"],
+  matcher: [
+    "/dashboard/:path*",
+    "/inventory/:path*",
+    "/orders/:path*",
+    "/reports/:path*",
+    "/admin/:path*",
+  ],
 };
