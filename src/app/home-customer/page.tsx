@@ -76,7 +76,7 @@ export default function CustomerHomePage() {
           }}
         >
           <div style={{ maxWidth: "560px", color: "#ffffff" }}>
-            <div style={{ fontSize: "11px", letterSpacing: "3px", textTransform: "uppercase", color: "#c8883a", marginBottom: "8px", fontWeight: 500 }}>
+            <div style={{ fontSize: "11px", letterSpacing: "3px", textTransform: "uppercase", color: "#c8883a", marginBottom: "4px", marginTop: "50px", fontWeight: 500 }}>
               WE BAKE COOKIES YOU KRAVE!
             </div>
             <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "64px", color: "#ffffff", lineHeight: 1.05, marginBottom: "24px" }}>
