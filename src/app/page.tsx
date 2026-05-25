@@ -4,10 +4,12 @@ import { cookies } from "next/headers";
 
 async function checkUserRole(): Promise<{ isAdmin: boolean } | null> {
   const cookieStore = await cookies();
-  // Get the token saved during your authentication sync pipeline
   const token = cookieStore.get("sb-access-token")?.value;
 
-  if (!token) return null;
+  if (!token) {
+    console.log("[NEXT_SERVER] No sb-access-token cookie detected yet.");
+    return null;
+  }
 
   try {
     const response = await fetch("http://127.0.0.1:8000/api/auth/me", {
@@ -15,21 +17,20 @@ async function checkUserRole(): Promise<{ isAdmin: boolean } | null> {
       headers: {
         Authorization: `Bearer ${token}`,
       },
-      // Ensure Next.js doesn't aggressively cache this session call
       cache: "no-store", 
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.log(`[NEXT_SERVER] Backend rejected token with status: ${response.status}`);
+      return null;
+    }
 
-    const userData = await response.json();
-    
-    // Check your backend user metadata role condition here
-    // e.g., checking if they belong to your '00_staff.sql' records
-    const isAdmin = userData.role === "admin" || userData.is_staff === true;
-    
+    const data = await response.json();
+    const isAdmin = data.is_admin === true || data.role === "admin";
+
     return { isAdmin };
   } catch (error) {
-    console.error("Failed to verify user session with FastAPI backend:", error);
+    console.error("[NEXT_SERVER] Backend connection failed:", error);
     return null;
   }
 }
@@ -37,23 +38,36 @@ async function checkUserRole(): Promise<{ isAdmin: boolean } | null> {
 export default async function RootPage() {
   const session = await checkUserRole();
 
-  // 1. If not logged in at all, let them view the public storefront/root home page
+  // State 1: Anonymous public visitors
   if (!session) {
-    // If you want a clean marketing/shop landing page, return its JSX component here.
-    // Otherwise, redirect them to sign in:
     return (
-      <main className="p-8 max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold">Welcome to CookieKrave 🍪</h1>
-        <p className="mt-2 text-gray-400">Delicious creations are baking. Sign in to place your orders!</p>
+      <main className="p-8 max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[60vh]">
+        <h1 className="text-4xl font-black mb-2">Welcome to CookieKrave 🍪</h1>
+        <p className="text-gray-400 mb-6">Delicious creations are baking. Sign in to place your orders!</p>
+        <a href="/auth/login" className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors">
+          Go to Sign In
+        </a>
       </main>
     );
   }
 
-  // 2. If logged in and verified as Admin/Staff -> Send to back-office metrics
+  // State 2: Back-office management personnel
   if (session.isAdmin) {
     redirect("/dashboard");
   }
 
-  // 3. If logged in but just a standard Customer -> Send to public home storefront / customer landing
-  redirect("/"); 
+  // State 3: Logged in customer storefront experience
+  return (
+    <main className="p-8 max-w-6xl mx-auto">
+      <div className="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+        <h1 className="text-2xl font-bold">CookieKrave Storefront 🍪</h1>
+        <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20">
+          Customer Account Connected
+        </span>
+      </div>
+      <div className="p-12 text-center bg-gray-900/50 rounded-xl border border-gray-800">
+        <p className="text-gray-400">Our signature baking menu and product catalogs are spinning up!</p>
+      </div>
+    </main>
+  );
 }

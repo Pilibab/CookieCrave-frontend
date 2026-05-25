@@ -1,12 +1,8 @@
+// callback-loading/page.tsx
 "use client";
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!, 
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from '../../../lib/supabase'
 
 export default function AuthCallbackLoading() {
     const router = useRouter();
@@ -20,39 +16,33 @@ export default function AuthCallbackLoading() {
                 hasRunPipeline.current = true;
 
                 const token = session.access_token; 
-                const user = session.user;
-
-                const automaticCustomerData = {
-                    CUST_NAME: user.user_metadata.full_name || user.user_metadata.name || "Google User",
-                    CUST_EMAIL: user.email,
-                    CUST_CONT_NO: user.phone || "Not Provided" 
-                };
 
                 try {
-                    const response = await fetch("http://127.0.0.1:8000/api/customers", {
-                        method: "POST",
+                    // Ping the backend /me endpoint. The backend checks if they are staff.
+                    // If they aren't staff, the backend automatically registers them as a customer!
+                    const response = await fetch("http://127.0.0.1:8000/api/auth/me", {
+                        method: "GET",
                         headers: {
                             "Content-Type": "application/json",
                             "Authorization": `Bearer ${token}` 
-                        },
-                        body: JSON.stringify(automaticCustomerData)
+                        }
                     });
 
                     if (response.ok) {
-                        // FIX 1: Save the token in a cookie so the Server Components can read it
+                        // Save the token in a cookie so Next.js Server Components can read it
                         document.cookie = `sb-access-token=${token}; path=/; max-age=3600; SameSite=Lax; Secure`;
                         
-                        // FIX 2: Push to the Root Page ("/"). 
-                        // The Root Page will hit `/me`, see if they are admin, and redirect accordingly!
+                        // Push to Root (/) to evaluate whether to send them to /dashboard or storefront
                         router.push("/");
                     } else {
-                        console.error("Backend validation failed tracking user registration.");
+                        console.error("Backend failed credentials verification validation.");
                         router.push("/auth/login");
                     }
                 } catch (err) {
-                    console.error("Network connectivity error connecting to FastAPI:", err);
+                    console.error("Network connectivity error connecting to FastAPI auth backend:", err);
                     router.push("/auth/login");
                 }
+                
             } else if (event === "SIGNED_OUT") {
                 router.push("/auth/login");
             }
