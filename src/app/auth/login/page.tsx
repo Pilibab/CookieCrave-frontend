@@ -1,11 +1,6 @@
 // auth/login/page.tsx
 "use client";
-import { createClient } from '@supabase/supabase-js'; // Or your custom supabase instance
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!, 
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import {supabase} from "../../../lib/supabase"
 
 export default function LoginPage() {
   const handleGoogleLogin = async () => {
