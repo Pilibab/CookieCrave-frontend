@@ -12,7 +12,7 @@ async function checkUserRole(): Promise<{ isAdmin: boolean } | null> {
   }
 
   try {
-    const response = await fetch("http://127.0.0.1:8000/api/auth/me", {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BACKEND_URL}/api/auth/me`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,

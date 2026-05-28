@@ -1,13 +1,13 @@
 // lib/api.ts
 // Central API client — update BASE_URL to match your backend
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
+const BASE_URL = process.env.NEXT_PUBLIC_API_BACKEND_URL ?? "http://localhost:8000";
 
 async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${BASE_URL}/api${path}`, {
     headers: {
       "Content-Type": "application/json",
       ...options.headers,
@@ -31,7 +31,7 @@ export const authApi = {
   // Google OAuth redirect is handled by backend:
   // GET /api/auth/google → redirects to Google
   // GET /api/auth/google/callback → sets session, redirects to /dashboard
-  googleLoginUrl: `${BASE_URL}/auth/google`,
+  googleLoginUrl: `${BASE_URL}/api/auth/google`,
 };
 
 // ─── Customers ────────────────────────────────────────────────────────────────

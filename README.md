@@ -56,7 +56,7 @@ npm install
 
 # Copy env and set your backend URL
 cp .env.example .env.local
-# NEXT_PUBLIC_API_URL=http://localhost:3001/api
+# NEXT_PUBLIC_API_BACKEND_URL=http://localhost:3001/api
 
 # Run dev server
 npm run dev
@@ -66,7 +66,7 @@ npm run dev
 
 | Variable | Description |
 |----------|-------------|
-| `NEXT_PUBLIC_API_URL` | Base URL of the Express backend (default: `http://localhost:3001/api`) |
+| `NEXT_PUBLIC_API_BACKEND_URL` | Base URL of the Express backend (default: `http://localhost:8000`) |
 
 ## Backend Contract (expected API endpoints)
 
