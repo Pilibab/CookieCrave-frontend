@@ -10,7 +10,7 @@ const getNavHref = (item: string) =>
     : item === "Track Order"
     ? "/home-customer/order-track"
     : item === "Contact"
-    ? "/home-customer#contact"
+    ? "/home-customer/contact"
     : item === "Home"
     ? "/home-customer"
     : "#";
@@ -29,6 +29,10 @@ const getActiveNav = (pathname: string) => {
 
   if (pathname.includes("/home-customer/about-us")) {
     return "About Us";
+  }
+
+  if (pathname.includes("/home-customer/contact")) {
+    return "Contact";
   }
 
   return "Home";
