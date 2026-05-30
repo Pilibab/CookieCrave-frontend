@@ -1,7 +1,5 @@
 {
   "/auth/login/page": "app/auth/login/page.js",
   "/home-customer/contact/page": "app/home-customer/contact/page.js",
-  "/home-customer/page": "app/home-customer/page.js",
-  "/home-customer/order-track/page": "app/home-customer/order-track/page.js",
-  "/home-customer/about-us/page": "app/home-customer/about-us/page.js"
+  "/home-customer/page": "app/home-customer/page.js"
 }
