@@ -6,47 +6,71 @@ import { ordersApi } from "@/lib/api";
 import Link from "next/link";
 import type { OrderStatus } from "@/types";
 
-const STATUSES: OrderStatus[] = ["Pending", "Confirmed", "Baking", "Out for Delivery", "For Pickup", "Completed", "Cancelled"];
+const STATUSES: OrderStatus[] = ["Pending", "Preparing", "Ready", "Delivered", "Cancelled"];
 
-const statusBadge: Record<OrderStatus, string> = {
-  Pending:           "badge-pending",
-  Confirmed:         "badge-confirmed",
-  Baking:            "badge-baking",
-  "Out for Delivery":"badge-delivery",
-  "For Pickup":      "badge-pickup",
-  Completed:         "badge-completed",
-  Cancelled:         "badge-cancelled",
+// Map display labels to actual API statuses
+const STATUS_MAP: Record<string, string> = {
+  "Pending": "Pending",
+  "Preparing": "Baking",
+  "Ready": "For Pickup",
+  "Delivered": "Out for Delivery",
+  "Cancelled": "Cancelled",
+};
+
+const statusBadge: Record<string, string> = {
+  Pending:            "badge-pending",
+  Confirmed:          "badge-confirmed",
+  Baking:             "badge-baking",
+  "Out for Delivery": "badge-delivery",
+  "For Pickup":       "badge-pickup",
+  Completed:          "badge-completed",
+  Cancelled:          "badge-cancelled",
 };
 
 export default function OrdersPage() {
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [activeFilter, setActiveFilter] = useState<string>("All");
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
-  const { data, loading, error, refetch } = useFetch(
-    () => ordersApi.list(page, 20, statusFilter || undefined),
-    [page, statusFilter]
+  const apiStatus = activeFilter === "All" ? undefined : STATUS_MAP[activeFilter] ?? activeFilter;
+
+  const { data, loading, error } = useFetch(
+    () => ordersApi.list(page, 20, apiStatus),
+    [page, activeFilter]
   );
 
   return (
-    <div className="page-body">
+    <div>
       <div className="page-header">
-        <h1 className="page-title">Orders</h1>
-        <Link href="/orders/new" className="btn btn-primary">+ New Order</Link>
+        <div>
+          <h1 className="page-title" style={{ color: "var(--navy)" }}>Orders</h1>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+            {data?.total ?? 0} orders • {data?.data.filter(o => o.order_status === "Baking" || o.order_status === "Confirmed").length ?? 0} active
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          {/* Search */}
+          <div className="search-bar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              placeholder="Search orders..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          <Link href="/orders/new" className="btn btn-primary" style={{ lineHeight: 1. }}>+ New Order</Link>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap mb-5">
-        <button
-          className={`btn ${statusFilter === "" ? "btn-primary" : "btn-secondary"}`}
-          onClick={() => { setStatusFilter(""); setPage(1); }}
-        >
-          All
-        </button>
-        {STATUSES.map((s) => (
+      {/* Status filter pills */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        {["All", ...STATUSES].map((s) => (
           <button
             key={s}
-            className={`btn ${statusFilter === s ? "btn-primary" : "btn-secondary"}`}
-            onClick={() => { setStatusFilter(s); setPage(1); }}
+            className={`status-btn${activeFilter === s ? " active" : ""}`}
+            onClick={() => { setActiveFilter(s); setPage(1); }}
           >
             {s}
           </button>
@@ -55,7 +79,7 @@ export default function OrdersPage() {
 
       <div className="card">
         {loading && <div className="spinner" />}
-        {error && <p className="text-red-600">Error: {error}</p>}
+        {error && <p style={{ color: "red" }}>Error: {error}</p>}
         {!loading && data && (
           <>
             <div className="table-wrap">
@@ -76,21 +100,19 @@ export default function OrdersPage() {
                   {data.data.length === 0 ? (
                     <tr>
                       <td colSpan={8}>
-                        <div className="empty-state">
-                          <p>No orders found</p>
-                        </div>
+                        <div className="empty-state"><p>No orders found</p></div>
                       </td>
                     </tr>
                   ) : (
                     data.data.map((order) => (
                       <tr key={order.order_id}>
-                        <td className="font-bold">#{order.order_id}</td>
+                        <td style={{ fontWeight: 600 }}>#{order.order_id}</td>
                         <td>
                           {order.customer
                             ? `${order.customer.given_name} ${order.customer.last_name}`
                             : `Customer #${order.customer_id}`}
                         </td>
-                        <td className="text-sm text-slate-500">
+                        <td style={{ fontSize: 12, color: "var(--text-muted)" }}>
                           {new Date(order.order_time).toLocaleString("en-PH", {
                             month: "short", day: "numeric",
                             hour: "2-digit", minute: "2-digit",
@@ -98,18 +120,18 @@ export default function OrdersPage() {
                         </td>
                         <td>{order.fulfillment?.fulfillment_type ?? "—"}</td>
                         <td>{order.payment_method}</td>
-                        <td className="font-bold">
+                        <td style={{ fontWeight: 600 }}>
                           ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                         </td>
                         <td>
-                          <span className={`badge ${statusBadge[order.order_status]}`}>
+                          <span className={`badge ${statusBadge[order.order_status] ?? "badge-pending"}`}>
                             {order.order_status}
                           </span>
                         </td>
                         <td>
                           <Link
                             href={`/orders/${order.order_id}`}
-                            className="text-amber-600 text-sm font-bold"
+                            style={{ color: "var(--navy)", fontSize: 12, fontWeight: 600 }}
                           >
                             View →
                           </Link>
@@ -121,26 +143,13 @@ export default function OrdersPage() {
               </table>
             </div>
 
-            {/* Pagination */}
             {data.total > 20 && (
-              <div className="flex gap-2 justify-end mt-4">
-                <button
-                  className="btn btn-secondary"
-                  disabled={page === 1}
-                  onClick={() => setPage(p => p - 1)}
-                >
-                  ← Prev
-                </button>
-                <span className="leading-9 text-sm text-slate-500">
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+                <button className="btn btn-secondary" disabled={page === 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
+                <span style={{ lineHeight: "36px", fontSize: 12, color: "var(--text-muted)" }}>
                   Page {page} of {Math.ceil(data.total / 20)}
                 </span>
-                <button
-                  className="btn btn-secondary"
-                  disabled={page * 20 >= data.total}
-                  onClick={() => setPage(p => p + 1)}
-                >
-                  Next →
-                </button>
+                <button className="btn btn-secondary" disabled={page * 20 >= data.total} onClick={() => setPage(p => p + 1)}>Next →</button>
               </div>
             )}
           </>
