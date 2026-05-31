@@ -271,7 +271,7 @@ export const inventoryApi = {
     ? getMock().mockInventoryApi.lowStock()
     : request<import("@/types").InventoryItem[]>("/inventory").then((items) =>
         items
-          .filter((i) => i.current_stock <= i.recorder_trigger)
+          .filter((i) => i.inv_stock <= i.inv_rt)
           .map((i) => ({ ...i, is_low: true })) as import("@/types").LowStockItem[]
       ),
 };
