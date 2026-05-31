@@ -29,50 +29,42 @@ export default function OrderDetailPage() {
   };
 
   if (loading) return <div className="page-body"><div className="spinner" /></div>;
-  if (error || !order) return <div className="page-body"><p style={{ color: "red" }}>Order not found.</p></div>;
+  if (error || !order) return <div className="page-body"><p className="text-red">Order not found.</p></div>;
 
   const currentIdx = STATUS_FLOW.indexOf(order.order_status as OrderStatus);
 
   return (
     <div className="page-body">
       <div className="page-header">
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link href="/orders" style={{ color: "#6b6f8a", fontSize: 14 }}>← Orders</Link>
+        <div className="flex items-center gap-3">
+          <Link href="/orders" className="text-slate-500 text-sm">← Orders</Link>
           <h1 className="page-title">Order #{order.order_id}</h1>
         </div>
-        <span style={{ fontSize: 13, color: "#6b6f8a" }}>
+        <span className="text-xs text-slate-500">
           Invoice: {order.invoice ? `#${order.invoice.invoice_id}` : "Pending"}
         </span>
       </div>
 
       {/* Status stepper */}
-      <div className="card" style={{ marginBottom: 20 }}>
-        <h3 style={{ fontSize: 15, marginBottom: 16 }}>Order Status</h3>
-        <div style={{ display: "flex", gap: 0, flexWrap: "wrap" }}>
+      <div className="card mb-5">
+        <h3 className="text-sm font-bold mb-4">Order Status</h3>
+        <div className="flex flex-wrap gap-0">
           {STATUS_FLOW.map((status, i) => {
             const done = i < currentIdx;
             const active = i === currentIdx;
             return (
-              <div key={status} style={{ display: "flex", alignItems: "center" }}>
+              <div key={status} className="flex items-center">
                 <button
                   onClick={() => handleStatusChange(status)}
                   disabled={updating}
-                  style={{
-                    padding: "8px 16px",
-                    border: "none",
-                    borderRadius: 6,
-                    fontSize: 13,
-                    fontWeight: active ? 700 : 500,
-                    cursor: "pointer",
-                    background: done ? "#d4edda" : active ? "#0d1240" : "#f0f0f0",
-                    color: done ? "#155724" : active ? "#fff" : "#6b6f8a",
-                    transition: "all 0.15s",
-                  }}
+                  className={`px-4 py-2 border-none rounded text-xs font-${active ? "bold" : "medium"} cursor-pointer transition-all ${
+                    done ? "bg-green-100 text-green-700" : active ? "bg-blue-950 text-white" : "bg-gray-100 text-slate-500"
+                  }`}
                 >
                   {done ? "✓ " : ""}{status}
                 </button>
                 {i < STATUS_FLOW.length - 1 && (
-                  <span style={{ color: "#ccc", margin: "0 4px" }}>›</span>
+                  <span className="text-gray-300 mx-1">›</span>
                 )}
               </div>
             );
@@ -81,8 +73,7 @@ export default function OrderDetailPage() {
             <button
               onClick={() => handleStatusChange("Cancelled")}
               disabled={updating}
-              className="btn btn-danger"
-              style={{ marginLeft: "auto", fontSize: 13 }}
+              className="btn btn-danger ml-auto text-xs"
             >
               Cancel Order
             </button>
@@ -90,10 +81,10 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="grid grid-cols-2 gap-4">
         {/* Customer info */}
         <div className="card">
-          <h3 style={{ fontSize: 15, marginBottom: 14 }}>Customer</h3>
+          <h3 className="text-sm font-bold mb-3.5">Customer</h3>
           {order.customer ? (
             <dl style={dl}>
               <dt>Name</dt>
@@ -103,12 +94,12 @@ export default function OrderDetailPage() {
               <dt>Contact</dt>
               <dd>{order.customer.contact_num ?? "—"}</dd>
             </dl>
-          ) : <p style={{ color: "#6b6f8a" }}>Customer #{order.customer_id}</p>}
+          ) : <p className="text-slate-500">Customer #{order.customer_id}</p>}
         </div>
 
         {/* Fulfillment info */}
         <div className="card">
-          <h3 style={{ fontSize: 15, marginBottom: 14 }}>Fulfillment</h3>
+          <h3 className="text-sm font-bold mb-3.5">Fulfillment</h3>
           <dl style={dl}>
             <dt>Type</dt>
             <dd>{order.fulfillment?.fulfillment_type ?? "—"}</dd>
@@ -135,7 +126,7 @@ export default function OrderDetailPage() {
             <dt>Payment</dt>
             <dd>{order.payment_method}</dd>
             <dt>Total</dt>
-            <dd style={{ fontWeight: 700, fontSize: 16 }}>
+            <dd className="font-bold text-base">
               ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
             </dd>
           </dl>
@@ -143,8 +134,8 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Order items */}
-      <div className="card" style={{ marginTop: 16 }}>
-        <h3 style={{ fontSize: 15, marginBottom: 14 }}>Ordered Items</h3>
+      <div className="card mt-4">
+        <h3 className="text-sm font-bold mb-3.5">Ordered Items</h3>
         <div className="table-wrap">
           <table>
             <thead>

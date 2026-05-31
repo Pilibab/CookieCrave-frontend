@@ -35,7 +35,7 @@ export default function OrdersPage() {
       </div>
 
       {/* Filters */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+      <div className="flex gap-2 flex-wrap mb-5">
         <button
           className={`btn ${statusFilter === "" ? "btn-primary" : "btn-secondary"}`}
           onClick={() => { setStatusFilter(""); setPage(1); }}
@@ -55,7 +55,7 @@ export default function OrdersPage() {
 
       <div className="card">
         {loading && <div className="spinner" />}
-        {error && <p style={{ color: "red" }}>Error: {error}</p>}
+        {error && <p className="text-red-600">Error: {error}</p>}
         {!loading && data && (
           <>
             <div className="table-wrap">
@@ -84,13 +84,13 @@ export default function OrdersPage() {
                   ) : (
                     data.data.map((order) => (
                       <tr key={order.order_id}>
-                        <td style={{ fontWeight: 600 }}>#{order.order_id}</td>
+                        <td className="font-bold">#{order.order_id}</td>
                         <td>
                           {order.customer
                             ? `${order.customer.given_name} ${order.customer.last_name}`
                             : `Customer #${order.customer_id}`}
                         </td>
-                        <td style={{ fontSize: 13, color: "#6b6f8a" }}>
+                        <td className="text-sm text-slate-500">
                           {new Date(order.order_time).toLocaleString("en-PH", {
                             month: "short", day: "numeric",
                             hour: "2-digit", minute: "2-digit",
@@ -98,7 +98,7 @@ export default function OrdersPage() {
                         </td>
                         <td>{order.fulfillment?.fulfillment_type ?? "—"}</td>
                         <td>{order.payment_method}</td>
-                        <td style={{ fontWeight: 600 }}>
+                        <td className="font-bold">
                           ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                         </td>
                         <td>
@@ -109,7 +109,7 @@ export default function OrdersPage() {
                         <td>
                           <Link
                             href={`/orders/${order.order_id}`}
-                            style={{ color: "#c8883a", fontSize: 13, fontWeight: 600 }}
+                            className="text-amber-600 text-sm font-bold"
                           >
                             View →
                           </Link>
@@ -123,7 +123,7 @@ export default function OrdersPage() {
 
             {/* Pagination */}
             {data.total > 20 && (
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+              <div className="flex gap-2 justify-end mt-4">
                 <button
                   className="btn btn-secondary"
                   disabled={page === 1}
@@ -131,7 +131,7 @@ export default function OrdersPage() {
                 >
                   ← Prev
                 </button>
-                <span style={{ lineHeight: "36px", fontSize: 13, color: "#6b6f8a" }}>
+                <span className="leading-9 text-sm text-slate-500">
                   Page {page} of {Math.ceil(data.total / 20)}
                 </span>
                 <button

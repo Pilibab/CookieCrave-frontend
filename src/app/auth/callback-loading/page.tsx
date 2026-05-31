@@ -72,10 +72,10 @@ export default function AuthCallbackLoading() {
     }, [router]);
 
     return (
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", background: "#0d1240", color: "#fff", fontFamily: "sans-serif" }}>
-            <div style={{ textAlign: "center" }}>
-                <p style={{ fontSize: 18, fontWeight: 500, marginBottom: 8 }}>Verifying your credentials...</p>
-                <p style={{ color: "#6b6f8a", fontSize: 14 }}>Synchronizing your secure CookieKrave Profile.</p>
+        <div className="flex justify-center items-center h-screen bg-blue-950 text-white font-sans">
+            <div className="text-center">
+                <p className="text-lg font-medium mb-2">Verifying your credentials...</p>
+                <p className="text-slate-400 text-sm">Synchronizing your secure CookieKrave Profile.</p>
             </div>
         </div>
     );

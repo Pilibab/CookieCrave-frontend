@@ -1,16 +1,15 @@
 import Sidebar from "@/components/layout/Sidebar";
+import AdminGuard from "../../components/layout/AdminGuard";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="layout">
-      <Sidebar />
-      <div className="main-content">
-        {children}
+    // <AdminGuard>
+      <div className="min-h-screen bg-amber-50">
+        <Sidebar />
+        <div className="pt-14">
+          {children}
+        </div>
       </div>
-    </div>
+    // </AdminGuard>
   );
 }

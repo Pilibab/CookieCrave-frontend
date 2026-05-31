@@ -1,10 +1,15 @@
 import Sidebar from "@/components/layout/Sidebar";
+import AdminGuard from "../../components/layout/AdminGuard";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default function PanelLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="layout">
-      <Sidebar />
-      <div className="main-content">{children}</div>
-    </div>
+    <AdminGuard>
+      <div className="min-h-screen bg-[var(--cream)]">
+        <Sidebar />
+        <div className="pt-[calc(var(--navbar-h)+28px)] px-10 pb-10 max-w-[1200px] mx-auto">
+          {children}
+        </div>
+      </div>
+    </AdminGuard>
   );
 }

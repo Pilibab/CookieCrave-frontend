@@ -1,4 +1,5 @@
 // frontend/src/app/page.tsx
+import "./globals.css"; // 
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
@@ -41,8 +42,10 @@ export default async function RootPage() {
   // State 1: Anonymous public visitors
   if (!session) {
     return (
-      <main className="p-8 max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[60vh]">
-        <h1 className="text-4xl font-black mb-2">Welcome to CookieKrave 🍪</h1>
+      <main className="p-8 max-w-4xl mx-auto flex flex-col items-center justify-center min-h-screen min-w-screen bg-(--navy)">
+        <h1 className="text-[var(--warm-white)] text-4xl font-black mb-2">
+          Welcome to CookieKrave 🍪
+        </h1>
         <p className="text-gray-400 mb-6">Delicious creations are baking. Sign in to place your orders!</p>
         <a href="/auth/login" className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors">
           Go to Sign In
@@ -58,6 +61,7 @@ export default async function RootPage() {
 
   // State 3: Logged in customer storefront experience
   return (
+    // ! redirect to store 
     <main className="p-8 max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
         <h1 className="text-2xl font-bold">CookieKrave Storefront 🍪</h1>

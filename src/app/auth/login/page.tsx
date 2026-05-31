@@ -14,28 +14,28 @@ export default function LoginPage() {
     };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
+    <div className="min-h-screen flex items-center justify-center bg-blue-950">
+      <div className="card w-full max-w-sm shadow-2xl">
         {/* Logo area */}
-        <div style={styles.logoArea}>
-          <h1 style={styles.brand}>cookie<br />krave</h1>
-          <p style={styles.tagline}>Order Management System</p>
+        <div className="text-center pb-6">
+          <h1 className="font-serif text-5xl leading-tight text-blue-950 -tracking-widest">cookie<br />krave</h1>
+          <p className="mt-2 text-sm text-slate-500 font-medium">Order Management System</p>
         </div>
 
-        <hr style={styles.divider} />
+        <hr className="border-none border-t-2 border-amber-50 mb-6" />
 
-        <div style={styles.formArea}>
-          <p style={styles.prompt}>Sign in to manage orders</p>
+        <div className="flex flex-col gap-4 items-center">
+          <p className="text-sm text-blue-950 font-medium">Sign in to manage orders</p>
 
           <button
             onClick={handleGoogleLogin}
-            style={styles.googleBtn}
+            className="flex items-center gap-2.5 px-5 py-2.5 border-2 border-amber-50 rounded-lg bg-white text-sm font-medium hover:bg-slate-50 transition-colors w-full justify-center font-sans text-blue-950"
           >
             <GoogleIcon />
             Continue with Google
           </button>
 
-          <p style={styles.note}>
+          <p className="text-xs text-slate-500 text-center leading-relaxed">
             Only authorized accounts can access the admin dashboard.
           </p>
         </div>
@@ -55,77 +55,3 @@ function GoogleIcon() {
     </svg>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#0d1240",
-  },
-  card: {
-    background: "#fff",
-    borderRadius: 16,
-    padding: "40px 36px",
-    width: "100%",
-    maxWidth: 380,
-    boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-  },
-  logoArea: {
-    textAlign: "center",
-    paddingBottom: 24,
-  },
-  brand: {
-    fontFamily: "'DM Serif Display', serif",
-    fontSize: 42,
-    lineHeight: 1.1,
-    color: "#0d1240",
-    letterSpacing: "-1px",
-  },
-  tagline: {
-    marginTop: 8,
-    fontSize: 13,
-    color: "#6b6f8a",
-    fontWeight: 500,
-  },
-  divider: {
-    border: "none",
-    borderTop: "1.5px solid #e2ddd6",
-    marginBottom: 24,
-  },
-  formArea: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 16,
-    alignItems: "center",
-  },
-  prompt: {
-    fontSize: 15,
-    color: "#0d1240",
-    fontWeight: 500,
-  },
-  googleBtn: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "11px 20px",
-    border: "1.5px solid #e2ddd6",
-    borderRadius: 8,
-    background: "#fff",
-    fontSize: 14,
-    fontWeight: 500,
-    cursor: "pointer",
-    width: "100%",
-    justifyContent: "center",
-    transition: "background 0.15s",
-    fontFamily: "'DM Sans', sans-serif",
-    color: "#0d1240",
-  },
-  note: {
-    fontSize: 12,
-    color: "#6b6f8a",
-    textAlign: "center",
-    lineHeight: 1.5,
-  },
-};
