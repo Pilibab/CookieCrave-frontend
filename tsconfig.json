@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2017",
+    "forceConsistentCasingInFileNames": true,
     "lib": [
       "dom",
       "dom.iterable",
@@ -37,5 +38,6 @@
   ],
   "exclude": [
     "node_modules"
-  ]
+  ], 
+  "types": ["node"]
 }
