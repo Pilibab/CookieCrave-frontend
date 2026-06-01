@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useFetch } from "@/hooks/useFetch";
 import { reportsApi } from "@/lib/api";
-import { WeeklySummary } from "./index"; // Assuming index.ts is in the same directory
+import type { WeeklySummary } from "@/types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -48,9 +48,9 @@ export default function ReportsPage() {
 
   const isCurrentWeek = weekStart === getMonday(today);
 
-  // ── Data ──
   const { data: weekSummary, loading: weekLoading } = useFetch<WeeklySummary>(
-    () => reportsApi.weeklySummary(weekStart), [weekStart]
+    () => reportsApi.weeklySummary(weekStart),
+    [weekStart]
   );
 
   const weekSeed = useMemo(() => weekStart.split("-").reduce((a, v) => a + Number(v), 0), [weekStart]);
@@ -82,10 +82,10 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* ── Wide Two-Column Layout ── */}
+      {/* ── Two-Column Layout ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 24, alignItems: "start" }}>
-        
-        {/* ══════════════ LEFT COLUMN: Context & Metrics ══════════════ */}
+
+        {/* ══ LEFT: Context & Metrics ══ */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {/* Week Nav Card */}
           <div className="card" style={{ padding: 16 }}>
@@ -95,15 +95,24 @@ export default function ReportsPage() {
                 <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{formatWeekLabel(weekStart)}</p>
               </div>
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <button className="btn btn-secondary" style={navBtn} onClick={() => { setWeekStart(w => addDays(w, -7)); setSelectedDay(null); }}>‹</button>
+                <button
+                  className="btn btn-secondary"
+                  style={navBtn}
+                  onClick={() => { setWeekStart((w) => addDays(w, -7)); setSelectedDay(null); }}
+                >‹</button>
                 {!isCurrentWeek && (
-                  <button className="btn btn-secondary" style={{ ...navBtn, fontSize: 11 }}
-                    onClick={() => { setWeekStart(getMonday(today)); setSelectedDay(null); }}>
-                    Today
-                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ ...navBtn, fontSize: 11 }}
+                    onClick={() => { setWeekStart(getMonday(today)); setSelectedDay(null); }}
+                  >Today</button>
                 )}
-                <button className="btn btn-secondary" style={navBtn} disabled={isCurrentWeek}
-                  onClick={() => { setWeekStart(w => addDays(w, 7)); setSelectedDay(null); }}>›</button>
+                <button
+                  className="btn btn-secondary"
+                  style={navBtn}
+                  disabled={isCurrentWeek}
+                  onClick={() => { setWeekStart((w) => addDays(w, 7)); setSelectedDay(null); }}
+                >›</button>
               </div>
             </div>
           </div>
@@ -111,10 +120,26 @@ export default function ReportsPage() {
           {/* Core Metrics Grid */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             {[
-              { label: "Weekly Revenue",   value: weekLoading ? "—" : `₱ ${Number(weekSummary?.total_revenue ?? 0).toLocaleString("en-PH")}` },
-              { label: "Total Orders",     value: weekLoading ? "—" : (weekSummary?.total_orders ?? 0) },
-              { label: "Completed",        value: weekLoading ? "—" : (weekSummary?.completed_orders ?? 0) },
-              { label: "Avg Order Value", value: weekLoading ? "—" : `₱ ${weekSummary?.total_orders ? Math.round(weekSummary.total_revenue / weekSummary.total_orders).toLocaleString("en-PH") : 0}` },
+              {
+                label: "Weekly Revenue",
+                value: weekLoading ? "—" : `₱ ${Number(weekSummary?.total_revenue ?? 0).toLocaleString("en-PH")}`,
+              },
+              {
+                label: "Total Orders",
+                value: weekLoading ? "—" : (weekSummary?.total_orders ?? 0),
+              },
+              {
+                label: "Completed",
+                value: weekLoading ? "—" : (weekSummary?.completed_orders ?? 0),
+              },
+              {
+                label: "Avg Order Value",
+                value: weekLoading
+                  ? "—"
+                  : `₱ ${weekSummary?.total_orders
+                    ? Math.round(Number(weekSummary.total_revenue) / weekSummary.total_orders).toLocaleString("en-PH")
+                    : 0}`,
+              },
             ].map(({ label, value }) => (
               <div key={label} className="metric-card" style={{ padding: "20px 16px" }}>
                 <div className="metric-value" style={{ fontSize: 22, fontWeight: 700, color: "var(--navy)" }}>{value}</div>
@@ -123,15 +148,17 @@ export default function ReportsPage() {
             ))}
           </div>
 
-          {/* Selected Day Analytics Inline Card */}
+          {/* Selected Day Analytics */}
           {selectedDayData ? (
             <div className="card" style={{ padding: 16, borderLeft: "4px solid var(--navy)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                 <div style={{ fontSize: 12, color: "var(--navy)", fontWeight: 700 }}>
                   Focus: {DAYS[selectedDay!]} ({formatShort(selectedDayData.date)})
                 </div>
-                <button onClick={() => setSelectedDay(null)}
-                  style={{ fontSize: 11, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                <button
+                  onClick={() => setSelectedDay(null)}
+                  style={{ fontSize: 11, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                >
                   Dismiss ×
                 </button>
               </div>
@@ -148,22 +175,39 @@ export default function ReportsPage() {
             </div>
           ) : (
             <div className="card" style={{ padding: 16, textAlign: "center", borderStyle: "dashed", opacity: 0.7 }}>
-              <p style={{ fontSize: 12, color: "var(--text-muted)" }}>Click any day bar or trend node to view distinct daily metrics.</p>
+              <p style={{ fontSize: 12, color: "var(--text-muted)" }}>Click any day bar or trend node to view daily metrics.</p>
+            </div>
+          )}
+
+          {/* Orders by Status breakdown */}
+          {weekSummary?.orders_by_status && (
+            <div className="card" style={{ padding: 16 }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)", marginBottom: 12 }}>Orders by Status</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {Object.entries(weekSummary.orders_by_status).map(([status, count]) => (
+                  <div key={status} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{status}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)" }}>{count}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
 
-        {/* ══════════════ RIGHT COLUMN: Heavy Visual Charts ══════════════ */}
+        {/* ══ RIGHT: Charts ══ */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          
+
           {/* Daily breakdown bar chart */}
           <div className="card" style={{ padding: 20 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <p style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)" }}>Daily Breakdown</p>
               {selectedDay !== null && (
-                <button onClick={() => setSelectedDay(null)}
-                  style={{ fontSize: 11, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-                  Clear Selection ×
+                <button
+                  onClick={() => setSelectedDay(null)}
+                  style={{ fontSize: 11, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Clear ×
                 </button>
               )}
             </div>
@@ -171,11 +215,18 @@ export default function ReportsPage() {
             <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 140 }}>
               {weekBars.map((v, i) => {
                 const isSelected = selectedDay === i;
-                const isToday    = addDays(weekStart, i) === today.toISOString().split("T")[0];
+                const isToday = addDays(weekStart, i) === today.toISOString().split("T")[0];
                 return (
-                  <div key={i} onClick={() => setSelectedDay(i === selectedDay ? null : i)}
-                    style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, height: "100%", justifyContent: "flex-end", cursor: "pointer" }}
-                    title={`${DAYS[i]}: ${v} orders`}>
+                  <div
+                    key={i}
+                    onClick={() => setSelectedDay(i === selectedDay ? null : i)}
+                    style={{
+                      flex: 1, display: "flex", flexDirection: "column",
+                      alignItems: "center", gap: 6, height: "100%",
+                      justifyContent: "flex-end", cursor: "pointer",
+                    }}
+                    title={`${DAYS[i]}: ${v} orders`}
+                  >
                     <span style={{ fontSize: 9, fontWeight: 700, color: "var(--navy)", opacity: isSelected ? 1 : 0, transition: "opacity 0.15s" }}>{v}</span>
                     <div style={{
                       width: "100%",
@@ -190,7 +241,12 @@ export default function ReportsPage() {
                       outlineOffset: 2,
                       opacity: isSelected ? 1 : 0.8,
                     }} />
-                    <span style={{ fontSize: 10, color: isSelected ? "var(--navy)" : "var(--text-muted)", fontWeight: isSelected ? 700 : 400, marginTop: 2 }}>
+                    <span style={{
+                      fontSize: 10,
+                      color: isSelected ? "var(--navy)" : "var(--text-muted)",
+                      fontWeight: isSelected ? 700 : 400,
+                      marginTop: 2,
+                    }}>
                       {isToday ? "●" : DAYS[i]}
                     </span>
                   </div>
@@ -203,17 +259,22 @@ export default function ReportsPage() {
           <div className="card" style={{ padding: 20 }}>
             <p style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)", marginBottom: 16 }}>Revenue Trend</p>
             <svg width="100%" height="110" viewBox="0 0 400 110" preserveAspectRatio="none" style={{ display: "block" }}>
-              {[22, 60, 98].map(y => <line key={y} x1="0" y1={y} x2="400" y2={y} stroke="var(--border)" strokeWidth="1" />)}
+              {[22, 60, 98].map((y) => (
+                <line key={y} x1="0" y1={y} x2="400" y2={y} stroke="var(--border)" strokeWidth="1" />
+              ))}
               <polyline
                 points={weekBars.map((v, i) => `${(i / 6) * 400},${102 - (v / maxWeekBar) * 90}`).join(" ")}
                 fill="none" stroke="var(--navy)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
               />
               {weekBars.map((v, i) => (
-                <circle key={i}
-                  cx={(i / 6) * 400} cy={102 - (v / maxWeekBar) * 90}
+                <circle
+                  key={i}
+                  cx={(i / 6) * 400}
+                  cy={102 - (v / maxWeekBar) * 90}
                   r={selectedDay === i ? 6 : 4}
                   fill={selectedDay === i ? "var(--navy)" : "#3d4799"}
-                  stroke="var(--warm-white)" strokeWidth="2"
+                  stroke="var(--warm-white)"
+                  strokeWidth="2"
                   style={{ cursor: "pointer", transition: "r 0.15s" }}
                   onClick={() => setSelectedDay(i === selectedDay ? null : i)}
                 />
@@ -221,7 +282,16 @@ export default function ReportsPage() {
             </svg>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
               {DAYS.map((d, i) => (
-                <span key={d} style={{ fontSize: 10, color: selectedDay === i ? "var(--navy)" : "var(--text-muted)", fontWeight: selectedDay === i ? 700 : 400 }}>{d}</span>
+                <span
+                  key={d}
+                  style={{
+                    fontSize: 10,
+                    color: selectedDay === i ? "var(--navy)" : "var(--text-muted)",
+                    fontWeight: selectedDay === i ? 700 : 400,
+                  }}
+                >
+                  {d}
+                </span>
               ))}
             </div>
           </div>
