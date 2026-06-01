@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useFetch, useMutation } from "@/hooks/useFetch";
 import { productsApi, customersApi, fulfillmentApi, ordersApi } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import type { FulfillmentType, PaymentMethod } from "@/types";
+import type { FulfillmentType, PaymentMethod } from "@/types/mytypes";
 
 interface CartItem { product_id: number; product_name: string; price: number; quantity: number; }
 

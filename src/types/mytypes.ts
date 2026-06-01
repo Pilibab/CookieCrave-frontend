@@ -1,3 +1,4 @@
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 export interface User {
   id: string;
@@ -6,46 +7,55 @@ export interface User {
   image?: string;
   role: "admin" | "customer";
 }
-
+// ─── Staff ────────────────────────────────────────────────────────────────
+export interface Staff {
+  staff_id: string ;
+  staff_name: string;
+  staff_email: string;
+  role: "admin"|"manager"|"baker";
+}
+export interface GCashPayment {
+  order_id: string;
+  reference_no: string;
+  amount: number;
+  paid_at: Date;
+}
 // ─── Customer ────────────────────────────────────────────────────────────────
 export interface Customer {
-  customer_id: number;
-  last_name: string;
-  given_name: string;
-  middle_name?: string;
-  suffix?: string;
-  email: string;
-  contact_num?: string;
-  created_at: string;
+  cust_id: number;
+  cust_lastname: string;
+  cust_firstname: string;
+  cust_middlename?: string;
+  cust_email: string;
+  cust_cont_no?: string;
+  cust_cd: string;
+  cust_social_provider: "google"
 }
 
 // ─── Product ─────────────────────────────────────────────────────────────────
 export interface Product {
-  product_id: number;
-  product_name: string;
-  product_description?: string;
-  price: number;
-  is_available: boolean;
-  shelf_life?: string;
+  prod_id: number;
+  prod_name: string;
+  prod_desc?: string;
+  prod_price: number;
+  prod_available: boolean;
 }
 
 // ─── Inventory ───────────────────────────────────────────────────────────────
 export interface InventoryItem {
-  inventory_id: number;
-  ingredients_name: string;
-  current_stock: number;
-  unit_of_measure: string;
-  recorder_trigger: number;
+  inv_id: number;
+  inv_ing_name: string;
+  inv_stock: number;
+  inv_uom: string;
+  inv_rt: number;
 }
 
 // ─── BOM ─────────────────────────────────────────────────────────────────────
 export interface BOMEntry {
   bom_id: number;
-  product_id: number;
-  inventory_id: number;
-  quantity_required: number;
-  product?: Product;
-  inventory?: InventoryItem;
+  prod_id: number;
+  inv_id: number;
+  bom_quan_req: number;
 }
 
 // ─── Fulfillment ─────────────────────────────────────────────────────────────
@@ -54,8 +64,6 @@ export type FulfillmentType = "Delivery" | "Pick_Up";
 export interface Fulfillment {
   fulfillment_id: number;
   fulfillment_type: FulfillmentType;
-  delivery?: Delivery;
-  pick_up?: PickUp;
 }
 
 export interface Delivery {
@@ -79,42 +87,29 @@ export interface Rider {
   rider_id: number;
   rider_name: string;
   rider_contact_num?: string;
-  current_location?: string;
 }
 
 // ─── Order ───────────────────────────────────────────────────────────────────
 export type PaymentMethod = "Cash" | "GCash";
-export type OrderStatus = "Pending" | "Confirmed" | "Baking" | "Out for Delivery" | "For Pickup" | "Completed" | "Cancelled";
+export type OrderStatus = "Pending"| "Preparing"| "Out for Delivery"| "Completed"| "Cancelled";
 
 export interface Order {
-  order_id: number;
-  customer_id: number;
+  ord_id: number;
+  cust_id: string;
   fulfillment_id: number;
-  order_time: string;
+  ord_time: Date;
   total_amount: number;
-  payment_method: PaymentMethod;
+  ord_fulfillment_time: Date;
+  ord_pay_meth: PaymentMethod;
   order_status: OrderStatus;
-  customer?: Customer;
-  fulfillment?: Fulfillment;
-  cart_items?: CartOrderLineItem[];
-  invoice?: Invoice;
+
 }
 
 // ─── Cart / Order Line Item ──────────────────────────────────────────────────
 export interface CartOrderLineItem {
-  order_id: number;
-  product_id: number;
-  quantity: number;
-  price_per_item: number;
-  product?: Product;
-}
-
-// ─── Invoice ─────────────────────────────────────────────────────────────────
-export interface Invoice {
-  invoice_id: number;
-  order_id: number;
-  invoice_date: string;
-  order?: Order;
+  ord_id: number;
+  prod_id: number;
+  cart_quan: number;
 }
 
 // ─── Reports / Aggregates ────────────────────────────────────────────────────

@@ -18,28 +18,24 @@ export default function Sidebar() {
   const { user, logout } = useAuth();
 
   return (
-    <aside className="fixed inset-y-0 left-0 w-60 bg-blue-950 flex flex-col z-100">
+    <aside style={s.sidebar}>
       {/* Brand */}
-      <div className="p-7 pb-5 border-b border-white border-opacity-8">
-        <span className="font-serif text-2xl text-white leading-tight block">cookie<br />krave</span>
-        <span className="text-xs text-amber-600 font-bold uppercase tracking-wider mt-1 block">Admin</span>
+      <div style={s.brand}>
+        <span style={s.brandText}>cookie<br />krave</span>
+        <span style={s.brandSub}>Admin</span>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5">
+      <nav style={s.nav}>
         {NAV.map(({ href, label, icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
               key={href}
               href={href}
-              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors ${
-                active 
-                  ? "bg-white bg-opacity-12 text-white" 
-                  : "text-white text-opacity-65 hover:text-opacity-100"
-              } text-sm font-medium`}
+              style={{ ...s.link, ...(active ? s.linkActive : {}) }}
             >
-              <span className="text-base w-5 text-center">{icon}</span>
+              <span style={s.icon}>{icon}</span>
               {label}
             </Link>
           );
@@ -47,22 +43,101 @@ export default function Sidebar() {
       </nav>
 
       {/* User */}
-      <div className="flex items-center gap-2.5 px-4 py-3.5 border-t border-white border-opacity-8">
+      <div style={s.userArea}>
         {user && (
           <>
-            <div className="w-8 h-8 rounded-full bg-amber-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 overflow-hidden">
+            <div style={s.avatar}>
               {user.image
-                ? <img src={user.image} alt={user.name} className="w-full h-full object-cover" />
+                ? <img src={user.image} alt={user.name} style={s.avatarImg} />
                 : <span>{user.name[0]}</span>}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-white overflow-hidden text-ellipsis whitespace-nowrap">{user.name}</p>
-              <p className="text-xs text-white text-opacity-50 overflow-hidden text-ellipsis whitespace-nowrap">{user.email}</p>
+            <div style={s.userInfo}>
+              <p style={s.userName}>{user.name}</p>
+              <p style={s.userEmail}>{user.email}</p>
             </div>
           </>
         )}
-        <button onClick={logout} className="bg-none border-none text-white text-opacity-50 hover:text-opacity-75 cursor-pointer text-base flex-shrink-0 p-1 transition-colors" title="Sign out">↩</button>
+        <button onClick={logout} style={s.logoutBtn} title="Sign out">↩</button>
       </div>
     </aside>
   );
 }
+
+const s: Record<string, React.CSSProperties> = {
+  sidebar: {
+    position: "fixed",
+    top: 0, left: 0, bottom: 0,
+    width: 240,
+    background: "#0d1240",
+    display: "flex",
+    flexDirection: "column",
+    zIndex: 100,
+  },
+  brand: {
+    padding: "28px 20px 20px",
+    borderBottom: "1px solid rgba(255,255,255,0.08)",
+  },
+  brandText: {
+    fontFamily: "'DM Serif Display', serif",
+    fontSize: 28,
+    color: "#fff",
+    lineHeight: 1.1,
+    display: "block",
+  },
+  brandSub: {
+    fontSize: 11,
+    color: "#c8883a",
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    marginTop: 4,
+    display: "block",
+  },
+  nav: {
+    flex: 1,
+    padding: "16px 12px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+  },
+  link: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "9px 12px",
+    borderRadius: 8,
+    color: "rgba(255,255,255,0.65)",
+    fontSize: 14,
+    fontWeight: 500,
+    transition: "background 0.15s, color 0.15s",
+  },
+  linkActive: {
+    background: "rgba(255,255,255,0.12)",
+    color: "#fff",
+  },
+  icon: { fontSize: 16, width: 20, textAlign: "center" },
+  userArea: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "14px 16px",
+    borderTop: "1px solid rgba(255,255,255,0.08)",
+  },
+  avatar: {
+    width: 32, height: 32,
+    borderRadius: "50%",
+    background: "#c8883a",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    color: "#fff", fontWeight: 700, fontSize: 14,
+    flexShrink: 0, overflow: "hidden",
+  },
+  avatarImg: { width: "100%", height: "100%", objectFit: "cover" },
+  userInfo: { flex: 1, minWidth: 0 },
+  userName: { fontSize: 13, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  userEmail: { fontSize: 11, color: "rgba(255,255,255,0.5)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  logoutBtn: {
+    background: "none", border: "none", color: "rgba(255,255,255,0.5)",
+    cursor: "pointer", fontSize: 16, flexShrink: 0,
+    padding: 4,
+  },
+};

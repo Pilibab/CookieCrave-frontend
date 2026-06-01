@@ -1,7 +1,7 @@
 // ─── Mock Data for UI preview (no backend needed) ────────────────────────────
 import type {
     Customer, Product, InventoryItem, Order, WeeklySummary, LowStockItem, Rider
-} from "@/types";
+} from "@/types/mytypes";
 
 export const mockCustomers: Customer[] = [
     { customer_id: 1, given_name: "Maria", middle_name: "S", last_name: "Santos", email: "maria@email.com", contact_num: "09171234567", created_at: "2025-01-10T00:00:00Z" },
@@ -97,7 +97,7 @@ export const mockRiders: Rider[] = [
     { rider_id: 1, rider_name: "Rodel Bautista", rider_contact_num: "09171112222", current_location: "Katipunan" },
 ];
 
-export const mockBomEntries: import("@/types").BOMEntry[] = [
+export const mockBomEntries: import("@/types/mytypes").BOMEntry[] = [
     { bom_id: 1, product_id: 1, inventory_id: 1, quantity_required: 200, product: mockProducts[0], inventory: mockInventory[0] },
     { bom_id: 2, product_id: 1, inventory_id: 2, quantity_required: 100, product: mockProducts[0], inventory: mockInventory[1] },
     { bom_id: 3, product_id: 1, inventory_id: 3, quantity_required: 150, product: mockProducts[0], inventory: mockInventory[2] },

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useFetch } from "@/hooks/useFetch";
 import { customersApi } from "@/lib/api";
-import type { Customer } from "@/types";
+import type { Customer } from "@/types/mytypes";
 
 export default function CustomersPage() {
   const [page, setPage] = useState(1);
@@ -16,7 +16,7 @@ export default function CustomersPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title text-[var(--navy)">Customers</h1>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">
+          <p className="text-xs text-(--text-muted) mt-0.5">
             {data?.total ?? 0} customers
           </p>
         </div>

@@ -3,7 +3,7 @@ import {
   mockCustomers, mockProducts, mockInventory,
   mockLowStock, mockOrders, mockWeeklySummary, mockRiders, mockBomEntries,
 } from "./mockData";
-import type { OrderStatus, Fulfillment, Delivery, PickUp, BOMEntry, CartOrderLineItem } from "@/types";
+import type { OrderStatus, Fulfillment, Delivery, PickUp, BOMEntry, CartOrderLineItem } from "@/types/mytypes";
 
 const delay = <T>(val: T): Promise<T> =>
   new Promise((res) => setTimeout(() => res(val), 300));

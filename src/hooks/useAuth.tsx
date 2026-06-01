@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { authApi } from "@/lib/api";
-import type { User } from "@/types";
+import type { User } from "@/types/mytypes";
 
 interface AuthContextValue {
   user: User | null;
