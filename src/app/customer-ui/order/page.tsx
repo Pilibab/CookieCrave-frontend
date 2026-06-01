@@ -15,7 +15,11 @@ type CartItem = { id: number; name: string; price: number; quantity: number; ima
 
 export default function OrderPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [submissionState, setSubmissionState] = useState({ submitted: false, orderId: "" });
+  const [submissionState, setSubmissionState] = useState({ 
+  submitted: false, 
+  orderId: "", 
+  method: "" 
+});
 
   const [contactNumber, setContactNumber] = useState("");
   const [fulfillment, setFulfillment] = useState("pickup");
@@ -62,32 +66,91 @@ export default function OrderPage() {
   setSubmissionState({
     submitted: true,
     orderId: newOrderId,
+    method: paymentMethod, 
   });
 };
 
-  if (submissionState.submitted) {
+ if (submissionState.submitted) {
     return (
-      <div style={{ fontFamily: "'DM Sans', sans-serif", background: "#fdf8f2", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ background: "#ffffff", border: "1px solid #e2ddd6", borderRadius: "16px", padding: "60px 48px", textAlign: "center", maxWidth: "480px" }}>
-          <div style={{ fontSize: "64px", marginBottom: "24px" }}>🍪</div>
+      <div style={{ fontFamily: "'DM Sans', sans-serif", background: "#fdf8f2", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+        {/* 🏛️ This container card was missing! */}
+        <div style={{ background: "#ffffff", border: "1px solid #e2ddd6", borderRadius: "16px", padding: "40px", textAlign: "center", maxWidth: "480px", width: "100%", boxSizing: "border-box" }}>
+          
+          {/* ✅ Your new Order Placed Image */}
+          <div style={{ width: "140px", height: "140px", margin: "0 auto 20px auto", overflow: "hidden", borderRadius: "50%" }}>
+            <img 
+              src="/images/OrderPlaced.jpg" 
+              alt="Order Placed Graphic" 
+              style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+            />
+          </div>
+
+          {/* 📝 Restored Heading */}
           <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "32px", color: "#0d1240", marginBottom: "12px" }}>
             Order Placed!
           </h2>
-          <p style={{ color: "#6b6f8a", fontSize: "14px", lineHeight: 1.7, marginBottom: "16px" }}>
+
+          <p style={{ color: "#6b6f8a", fontSize: "14px", lineHeight: 1.7, margin: "0 0 8px 0" }}>
             Your order has been placed successfully.
           </p>
-          <p style={{ color: "#6b6f8a", fontSize: "13px", marginBottom: "32px" }}>
+
+          <p style={{ color: "#6b6f8a", fontSize: "13px", marginBottom: "24px" }}>
             Order ID: <strong>{submissionState.orderId}</strong>
           </p>
-          <a href="/customer-ui" style={{ textDecoration: "none" }}>
-            <button style={{ background: "#0d1240", color: "#fff", border: "none", borderRadius: "8px", padding: "12px 28px", fontSize: "14px", fontWeight: 500, cursor: "pointer" }}>
-              Back to Home
-            </button>
-          </a>
+
+        {/* CANCELLATION BUTTON */}
+        <div style={{ background: "#fff5f5", border: "1px solid #ffe3e3", borderRadius: "8px", padding: "12px", marginBottom: "24px" }}>
+          <p style={{ color: "#e53e3e", fontSize: "13px", margin: "0 0 8px 0" }}>
+              You can cancel your order within the next 5 minutes.
+          </p>
+          <button 
+            onClick={() => { /* Add your cancellation API call here */ alert("Order Cancelled"); }}
+            style={{ background: "#e53e3e", color: "#fff", border: "none", borderRadius: "6px", padding: "6px 16px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+          >
+            Cancel Order
+          </button>
         </div>
+
+        {/* 2. THE CONDITIONAL GCASH FLOW STEP */}
+        {submissionState.method === "gcash" && (
+          <div style={{ background: "#f4f7ff", border: "1px solid #d0e0ff", borderRadius: "12px", padding: "20px", marginBottom: "24px", textAlign: "center" }}>
+            <h4 style={{ color: "#0d1240", margin: "0 0 8px 0" }}> Complete Your GCash Payment</h4>
+            <p style={{ fontSize: "13px", color: "#6b6f8a", margin: "0 0 16px 0" }}>
+              Scan the QR code below to pay <strong>₱{total}</strong>, then enter the Reference Number.
+            </p>
+            
+           {/* ✅ ACTUAL GCASH QR CODE IMAGE */}
+    <div style={{ width: "250px", height: "250px", margin: "0 auto 16px auto", borderRadius: "12px", overflow: "hidden", border: "1px solid #cbd5e1", background: "#fff", padding: "8px", boxSizing: "border-box" }}>
+      <img 
+        src="/images/GcashQRCode.png" 
+        alt="GCash QR Code" 
+        style={{ width: "100%", height: "100%", objectFit: "contain" }} 
+      />
+    </div>
+
+            <input 
+              type="text" 
+              placeholder="13-Digit GCash Reference No." 
+              style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", textAlign: "center", boxSizing: "border-box", marginBottom: "12px" }}
+            />
+            <button 
+              onClick={() => { /* Save Reference number to your teammate's new table */ alert("Payment submitted!"); }}
+              style={{ width: "100%", background: "#1a56db", color: "#fff", border: "none", borderRadius: "6px", padding: "10px 0", fontWeight: 600, cursor: "pointer", fontSize: "13px" }}
+            >
+              Submit Payment Details
+            </button>
+          </div>
+        )}
+
+        <a href="/customer-ui" style={{ textDecoration: "none" }}>
+          <button style={{ background: "#0d1240", color: "#fff", border: "none", borderRadius: "8px", padding: "12px 28px", fontSize: "14px", fontWeight: 500, cursor: "pointer", width: "100%" }}>
+            Back to Home
+          </button>
+        </a>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   return (
     <div style={{ fontFamily: "'DM Sans', sans-serif", background: "#fdf8f2", minHeight: "100vh", color: "#0d1240" }}>
