@@ -21,20 +21,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/customer-ui/page.js"
     ],
-    "/customer-ui/about-us/page": [
+    "/customer-ui/order/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/customer-ui/about-us/page.js"
-    ],
-    "/customer-ui/order-track/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/customer-ui/order-track/page.js"
-    ],
-    "/customer-ui/contact/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/customer-ui/contact/page.js"
+      "static/chunks/app/customer-ui/order/page.js"
     ]
   }
 }

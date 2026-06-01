@@ -17,7 +17,6 @@ export default function OrderPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [submissionState, setSubmissionState] = useState({ submitted: false, orderId: "" });
 
-  const [customerName, setCustomerName] = useState("");
   const [contactNumber, setContactNumber] = useState("");
   const [fulfillment, setFulfillment] = useState("pickup");
   const [paymentMethod, setPaymentMethod] = useState("cash");
@@ -43,11 +42,6 @@ export default function OrderPage() {
   const handleSubmit = () => {
   if (cart.length === 0) {
     alert("Please add at least one cookie.");
-    return;
-  }
-
-  if (!customerName.trim()) {
-    alert("Please enter your name.");
     return;
   }
 
@@ -181,21 +175,6 @@ export default function OrderPage() {
 >
   Customer Details
 </h4>
-
-<input
-  type="text"
-  placeholder="Full Name"
-  value={customerName}
-  onChange={(e) => setCustomerName(e.target.value)}
-  style={{
-    width: "100%",
-    padding: "12px",
-    border: "1px solid #e2ddd6",
-    borderRadius: "8px",
-    marginBottom: "12px",
-    boxSizing: "border-box",
-  }}
-/>
 
 <input
   type="text"
