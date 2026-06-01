@@ -22,31 +22,29 @@ const getActiveNav = (pathname: string) => {
   if (pathname.includes("/order-track") || pathname.includes("/customer-ui/order-track")) {
     return "Track Order";
   }
-
   if (isOrderPath(pathname)) {
     return "";
   }
-
   if (pathname.includes("/customer-ui/about-us")) {
     return "About Us";
   }
-
   if (pathname.includes("/customer-ui/contact")) {
     return "Contact";
   }
-
   return "Home";
 };
 
 export default function CustomerNavbar() {
   const [activeNav, setActiveNav] = useState<string>("Home");
   const [isCartPage, setIsCartPage] = useState<boolean>(false);
+  const [isProfilePage, setIsProfilePage] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const pathname = window.location.pathname;
     setIsCartPage(isOrderPath(pathname));
+    setIsProfilePage(pathname.includes("/customer-ui/profile"));
     setActiveNav(getActiveNav(pathname));
   }, []);
 
@@ -96,6 +94,7 @@ export default function CustomerNavbar() {
           </a>
         ))}
 
+        {/* 🛒 Shopping Cart Button */}
         {!isCartPage && (
           <a href="/customer-ui/order" style={{ textDecoration: "none" }}>
             <span
@@ -113,27 +112,39 @@ export default function CustomerNavbar() {
                 cursor: "pointer",
               }}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                aria-hidden="true"
-              >
-                <path
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3h2l.4 2M7 13h10l4-8H5.4" />
                 <circle cx="10" cy="20" r="1" fill="currentColor" />
                 <circle cx="18" cy="20" r="1" fill="currentColor" />
               </svg>
             </span>
           </a>
         )}
+
+        {/* 👤 Account Profile Button */}
+        <a href="/customer-ui/profile" style={{ textDecoration: "none" }}>
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginLeft: "4px",
+              width: "44px",
+              height: "44px",
+              background: isProfilePage ? "#c8883a" : "transparent",
+              color: isProfilePage ? "#ffffff" : "#0d1240",
+              border: isProfilePage ? "none" : "1.5px solid #e2ddd6",
+              borderRadius: "14px",
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </span>
+        </a>
       </div>
     </nav>
   );

@@ -35,6 +35,16 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/customer-ui/about-us/page.js"
+    ],
+    "/customer-ui/order-track/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/customer-ui/order-track/page.js"
+    ],
+    "/customer-ui/profile/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/customer-ui/profile/page.js"
     ]
   }
 }
