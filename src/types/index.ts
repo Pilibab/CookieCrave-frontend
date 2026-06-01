@@ -9,41 +9,41 @@ export interface User {
 
 // ─── Customer ────────────────────────────────────────────────────────────────
 export interface Customer {
-  customer_id: number;
-  last_name: string;
-  given_name: string;
-  middle_name?: string;
-  suffix?: string;
-  email: string;
-  contact_num?: string;
-  created_at: string;
+  cust_id: string; // Backend expects UUID string
+  cust_firstname: string;
+  cust_lastname: string;
+  cust_middlename?: string;
+  cust_email: string;
+  cust_social_provider?: string;
+  cust_cont_no?: string;
+  cust_cd: string; // Timestamp
 }
 
 // ─── Product ─────────────────────────────────────────────────────────────────
 export interface Product {
-  product_id: number;
-  product_name: string;
-  product_description?: string;
-  price: number;
-  is_available: boolean;
-  shelf_life?: string;
+  prod_id: number;
+  prod_name: string;
+  prod_desc?: string;
+  prod_price: number;
+  prod_available: boolean;
+  shelf_life?: string; // Kept optional client-side if handled dynamically
 }
 
 // ─── Inventory ───────────────────────────────────────────────────────────────
 export interface InventoryItem {
-  inventory_id: number;
-  ingredients_name: string;
-  current_stock: number;
-  unit_of_measure: string;
-  recorder_trigger: number;
+  inv_id: number;
+  inv_ing_name: string;
+  inv_stock: number;
+  inv_uom: string; // e.g., "pcs"
+  inv_rt: number;  // Reorder Trigger point
 }
 
-// ─── BOM ─────────────────────────────────────────────────────────────────────
+// ─── BOM (Bill of Materials) ─────────────────────────────────────────────────
 export interface BOMEntry {
   bom_id: number;
-  product_id: number;
-  inventory_id: number;
-  quantity_required: number;
+  prod_id: number;
+  inv_id: number;
+  bom_quan_req: number;
   product?: Product;
   inventory?: InventoryItem;
 }
@@ -53,7 +53,7 @@ export type FulfillmentType = "Delivery" | "Pick_Up";
 
 export interface Fulfillment {
   fulfillment_id: number;
-  fulfillment_type: FulfillmentType;
+  fulfillment_type: FulfillmentType; // "Delivery" or "Pick_Up"
   delivery?: Delivery;
   pick_up?: PickUp;
 }
@@ -88,11 +88,14 @@ export type OrderStatus = "Pending" | "Confirmed" | "Baking" | "Out for Delivery
 
 export interface Order {
   order_id: number;
-  customer_id: number;
+  cust_id: string;       // Synced to look up the customer UUID string
   fulfillment_id: number;
-  order_time: string;
   total_amount: number;
-  payment_method: PaymentMethod;
+  ord_pay_meth: string;  // Matches backend schema name
+  ord_f_type: string;    // Matches backend schema fulfillment type label
+  prod_ids: number[];    // Backend expects an array of numbers representing item IDs
+  reference_no?: string; // String tracker for tracking references
+  order_time: string;
   order_status: OrderStatus;
   customer?: Customer;
   fulfillment?: Fulfillment;
@@ -103,7 +106,7 @@ export interface Order {
 // ─── Cart / Order Line Item ──────────────────────────────────────────────────
 export interface CartOrderLineItem {
   order_id: number;
-  product_id: number;
+  prod_id: number;
   quantity: number;
   price_per_item: number;
   product?: Product;

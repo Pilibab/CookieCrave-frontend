@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useFetch } from "@/hooks/useFetch";
 import { ordersApi } from "@/lib/api";
 import Link from "next/link";
-import type { OrderStatus } from "@/types/mytypes";
+import type { OrderStatus, Order, PaginatedResponse } from "./index"; // Assuming index.ts contains the definitions
 
 const STATUSES: OrderStatus[] = ["Pending", "Confirmed", "Baking", "Out for Delivery", "For Pickup", "Completed", "Cancelled"];
 
@@ -22,7 +22,7 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [page, setPage] = useState(1);
 
-  const { data, loading, error, refetch } = useFetch(
+  const { data, loading, error, refetch } = useFetch<PaginatedResponse<Order>>(
     () => ordersApi.list(page, 20, statusFilter || undefined),
     [page, statusFilter]
   );
@@ -87,8 +87,8 @@ export default function OrdersPage() {
                         <td style={{ fontWeight: 600 }}>#{order.order_id}</td>
                         <td>
                           {order.customer
-                            ? `${order.customer.given_name} ${order.customer.last_name}`
-                            : `Customer #${order.customer_id}`}
+                            ? `${order.customer.cust_firstname} ${order.customer.cust_lastname}`
+                            : `Customer #${order.cust_id}`}
                         </td>
                         <td style={{ fontSize: 13, color: "#6b6f8a" }}>
                           {new Date(order.order_time).toLocaleString("en-PH", {
@@ -97,7 +97,7 @@ export default function OrdersPage() {
                           })}
                         </td>
                         <td>{order.fulfillment?.fulfillment_type ?? "—"}</td>
-                        <td>{order.payment_method}</td>
+                        <td>{order.ord_pay_meth}</td>
                         <td style={{ fontWeight: 600 }}>
                           ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                         </td>
