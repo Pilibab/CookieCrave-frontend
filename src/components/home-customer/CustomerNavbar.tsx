@@ -6,20 +6,20 @@ const navItems = ["Home", "About Us", "Track Order", "Contact"];
 
 const getNavHref = (item: string) =>
   item === "About Us"
-    ? "/home-customer/about-us"
+    ? "/customer-ui/about-us"
     : item === "Track Order"
-    ? "/home-customer/order-track"
+    ? "/customer-ui/order-track"
     : item === "Contact"
-    ? "/home-customer/contact"
+    ? "/customer-ui/contact"
     : item === "Home"
-    ? "/home-customer"
+    ? "/customer-ui"
     : "#";
 
 const isOrderPath = (pathname: string) =>
-  pathname === "/home-customer/order" || pathname === "/home-customer/order/";
+  pathname === "/customer-ui/order" || pathname === "/customer-ui/order/";
 
 const getActiveNav = (pathname: string) => {
-  if (pathname.includes("/order-track") || pathname.includes("/home-customer/order-track")) {
+  if (pathname.includes("/order-track") || pathname.includes("/customer-ui/order-track")) {
     return "Track Order";
   }
 
@@ -27,11 +27,11 @@ const getActiveNav = (pathname: string) => {
     return "";
   }
 
-  if (pathname.includes("/home-customer/about-us")) {
+  if (pathname.includes("/customer-ui/about-us")) {
     return "About Us";
   }
 
-  if (pathname.includes("/home-customer/contact")) {
+  if (pathname.includes("/customer-ui/contact")) {
     return "Contact";
   }
 
@@ -67,7 +67,7 @@ export default function CustomerNavbar() {
         zIndex: 100,
       }}
     >
-      <a href="/home-customer" style={{ textDecoration: "none" }}>
+      <a href="/customer-ui" style={{ textDecoration: "none" }}>
         <img
           src="/images/CKWebLogo.png"
           alt="Cookie Krave"
@@ -97,7 +97,7 @@ export default function CustomerNavbar() {
         ))}
 
         {!isCartPage && (
-          <a href="/home-customer/order" style={{ textDecoration: "none" }}>
+          <a href="/customer-ui/order" style={{ textDecoration: "none" }}>
             <span
               style={{
                 display: "inline-flex",

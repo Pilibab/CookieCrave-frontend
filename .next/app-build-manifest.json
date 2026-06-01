@@ -11,20 +11,30 @@
       "static/chunks/main-app.js",
       "static/chunks/app/auth/login/page.js"
     ],
-    "/home-customer/layout": [
+    "/customer-ui/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/home-customer/layout.js"
+      "static/chunks/app/customer-ui/layout.js"
     ],
-    "/home-customer/page": [
+    "/customer-ui/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/home-customer/page.js"
+      "static/chunks/app/customer-ui/page.js"
     ],
-    "/home-customer/contact/page": [
+    "/customer-ui/about-us/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/home-customer/contact/page.js"
+      "static/chunks/app/customer-ui/about-us/page.js"
+    ],
+    "/customer-ui/order-track/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/customer-ui/order-track/page.js"
+    ],
+    "/customer-ui/contact/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/customer-ui/contact/page.js"
     ]
   }
 }
