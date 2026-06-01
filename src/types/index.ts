@@ -7,35 +7,48 @@ export interface User {
   role: "admin" | "customer";
 }
 
+// ─── Staff ────────────────────────────────────────────────────────────────────
+export interface Staff {
+  staff_id: string;
+  staff_name: string;
+  staff_email: string;
+  role: "admin" | "manager" | "baker";
+}
+
 // ─── Customer ────────────────────────────────────────────────────────────────
+// Matches backend: app/model/customer.py → Customer / CustomerBase
 export interface Customer {
-  cust_id: string; // Backend expects UUID string
+  cust_id: string;               // UUID from Supabase auth
   cust_firstname: string;
   cust_lastname: string;
-  cust_middlename?: string;
+  cust_middlename?: string | null;
   cust_email: string;
-  cust_social_provider?: string;
-  cust_cont_no?: string;
-  cust_cd: string; // Timestamp
+  cust_social_provider?: string | null;  // "google" | "facebook"
+  cust_cont_no?: string | null;
+  cust_cd: string;               // datetime ISO string (auto-set by DB)
 }
 
 // ─── Product ─────────────────────────────────────────────────────────────────
+// Matches backend: app/model/products.py → Product / ProductBase
 export interface Product {
   prod_id: number;
   prod_name: string;
   prod_desc?: string;
   prod_price: number;
   prod_available: boolean;
-  shelf_life?: string; // Kept optional client-side if handled dynamically
+  // NOTE: no shelf_life — not in backend model
 }
 
 // ─── Inventory ───────────────────────────────────────────────────────────────
+// Matches backend: app/model/inventory.py → Inventory / InventoryBase
+export type UnitType = "pcs" | "ml" | "g" | "kg";
+
 export interface InventoryItem {
   inv_id: number;
   inv_ing_name: string;
   inv_stock: number;
-  inv_uom: string; // e.g., "pcs"
-  inv_rt: number;  // Reorder Trigger point
+  inv_uom: UnitType;
+  inv_rt: number;             // reorder trigger point
 }
 
 // ─── BOM (Bill of Materials) ─────────────────────────────────────────────────
@@ -53,7 +66,7 @@ export type FulfillmentType = "Delivery" | "Pick_Up";
 
 export interface Fulfillment {
   fulfillment_id: number;
-  fulfillment_type: FulfillmentType; // "Delivery" or "Pick_Up"
+  fulfillment_type: FulfillmentType;
   delivery?: Delivery;
   pick_up?: PickUp;
 }
@@ -83,44 +96,51 @@ export interface Rider {
 }
 
 // ─── Order ───────────────────────────────────────────────────────────────────
+// Matches backend: app/model/order.py → Order / OrderBase
+// Backend statuses: "Pending" | "Preparing" | "Out for Delivery" | "Completed" | "Cancelled"
 export type PaymentMethod = "Cash" | "GCash";
-export type OrderStatus = "Pending" | "Confirmed" | "Baking" | "Out for Delivery" | "For Pickup" | "Completed" | "Cancelled";
+export type OrderStatus =
+  | "Pending"
+  | "Preparing"
+  | "Out for Delivery"
+  | "Completed"
+  | "Cancelled";
 
 export interface Order {
-  order_id: number;
-  cust_id: string;       // Synced to look up the customer UUID string
-  fulfillment_id: number;
+  ord_id: number;                       // PK — backend field name
+  cust_id: string;                      // UUID string
+  fulfillment_id?: number | null;
   total_amount: number;
-  ord_pay_meth: string;  // Matches backend schema name
-  ord_f_type: string;    // Matches backend schema fulfillment type label
-  prod_ids: number[];    // Backend expects an array of numbers representing item IDs
-  reference_no?: string; // String tracker for tracking references
-  order_time: string;
+  ord_pay_meth: PaymentMethod;
+  ord_f_type: string;                   // fulfillment type label used on create
   order_status: OrderStatus;
+  ord_time: string;                     // datetime ISO string
+  ord_fulfillment_time?: string | null;
+  // Joined/nested (not always present):
   customer?: Customer;
   fulfillment?: Fulfillment;
   cart_items?: CartOrderLineItem[];
-  invoice?: Invoice;
+}
+
+// ─── GCash Payment ───────────────────────────────────────────────────────────
+export interface GCashPayment {
+  order_id: string;
+  reference_no: string;
+  amount: number;
+  paid_at: string;
 }
 
 // ─── Cart / Order Line Item ──────────────────────────────────────────────────
 export interface CartOrderLineItem {
-  order_id: number;
+  ord_id: number;
   prod_id: number;
-  quantity: number;
-  price_per_item: number;
+  cart_quan: number;
+  price_per_item?: number;
   product?: Product;
 }
 
-// ─── Invoice ─────────────────────────────────────────────────────────────────
-export interface Invoice {
-  invoice_id: number;
-  order_id: number;
-  invoice_date: string;
-  order?: Order;
-}
-
 // ─── Reports / Aggregates ────────────────────────────────────────────────────
+// Matches backend: app/model/report.py → WeeklySummary
 export interface WeeklySummary {
   week_start: string;
   week_end: string;

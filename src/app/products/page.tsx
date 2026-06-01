@@ -2,258 +2,152 @@
 
 import { useState } from "react";
 import { useFetch } from "@/hooks/useFetch";
-import { productsApi } from "@/lib/api";
-import type { Product } from "./index"; // Using index.ts for accurate typing
+import { customersApi } from "@/lib/api";
+import type { Customer } from "@/types";
 
-const CATEGORIES = ["All", "Classic", "Specialty", "Unavailable"];
-
-export default function ProductsPage() {
-  const { data: products, loading, refetch } = useFetch<Product[]>(productsApi.list);
+export default function CustomersPage() {
+  const [page, setPage] = useState(1);
+  // Backend GET /customers returns List[Customer] (not paginated shape)
+  // Accept both shapes gracefully
+  const { data: raw, loading, refetch } = useFetch<Customer[] | { data: Customer[]; total: number }>(
+    () => customersApi.list(page, 20) as unknown as Promise<Customer[] | { data: Customer[]; total: number }>,
+    [page]
+  );
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Product | null>(null);
-  const [activeCategory, setActiveCategory] = useState("All");
   const [search, setSearch] = useState("");
 
-  const filtered = (products ?? []).filter((p) => {
-    const matchSearch =
-      !search || p.prod_name.toLowerCase().includes(search.toLowerCase());
-    const matchCat =
-      activeCategory === "All" ||
-      (activeCategory === "Unavailable" && !p.prod_available) ||
-      (activeCategory !== "Unavailable" && p.prod_available);
-    return matchSearch && matchCat;
-  });
+  const customers: Customer[] = Array.isArray(raw)
+    ? raw
+    : (raw as { data: Customer[] } | null)?.data ?? [];
+  const total: number = Array.isArray(raw)
+    ? raw.length
+    : (raw as { total: number } | null)?.total ?? 0;
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Delete this product?")) return;
-    await productsApi.delete(id);
-    refetch();
-  };
+  const filtered = customers.filter((c) =>
+    !search ||
+    `${c.cust_firstname} ${c.cust_lastname}`.toLowerCase().includes(search.toLowerCase()) ||
+    c.cust_email.toLowerCase().includes(search.toLowerCase()) ||
+    (c.cust_cont_no ?? "").includes(search)
+  );
 
   return (
     <div>
-      {/* ── Page header ── */}
-      <div className="page-header" style={{ marginBottom: 8 }}>
+      <div className="page-header">
         <div>
-          <h1 className="page-title" style={{ margin: 0, letterSpacing: "-0.5px" }}>
-            Products
-          </h1>
-          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4, margin: "4px 0 0" }}>
-            {products?.length ?? 0} products · changes sync to customer order page
+          <h1 className="page-title" style={{ color: "var(--navy)" }}>Customers</h1>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+            {total} customers
           </p>
         </div>
-
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          {/* Search */}
           <div className="search-bar">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
             <input
-              placeholder="Search products..."
+              placeholder="Search customers..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-
-          {/* New product button */}
-          <button
-            className="btn btn-primary"
-            onClick={() => { setEditing(null); setShowForm(true); }}
-          >
-            <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> New Product
-          </button>
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}>+ Add Customer</button>
         </div>
       </div>
 
-      {/* ── Category pills ── */}
-      <div style={{ display: "flex", gap: 8, margin: "24px 0 28px" }}>
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
-            className={`status-btn ${activeCategory === cat ? "active" : ""}`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Modal ── */}
       {showForm && (
-        <ProductForm
-          initial={editing}
-          onClose={() => setShowForm(false)}
-          onSaved={refetch}
-        />
+        <CustomerForm onClose={() => setShowForm(false)} onSaved={refetch} />
       )}
 
-      {/* ── Product rows (list style) ── */}
-      {loading && <div className="spinner" />}
-      {!loading && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {filtered.map((p) => (
-            <div
-              key={p.prod_id}
-              style={{
-                background: "var(--warm-white)",
-                border: "1.5px solid var(--border)",
-                borderRadius: 16,
-                display: "flex",
-                alignItems: "center",
-                padding: "14px 20px",
-                gap: 18,
-                opacity: p.prod_available ? 1 : 0.6,
-                transition: "box-shadow .2s, transform .2s",
-                boxShadow: "0 1px 4px rgba(13,18,64,0.05)",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(13,18,64,0.10)";
-                (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.boxShadow = "0 1px 4px rgba(13,18,64,0.05)";
-                (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
-              }}
-            >
-              {/* Thumbnail */}
-              <div
-                style={{
-                  width: 68,
-                  height: 68,
-                  borderRadius: 12,
-                  overflow: "hidden",
-                  flexShrink: 0,
-                  background: "var(--cream)",
-                  border: "1px solid var(--border)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {/* Fallback to emoji since product interface does not contain an image parameter */}
-                <span style={{ fontSize: 30 }}>🍪</span>
-              </div>
-
-              {/* Name + desc */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                  <span style={{ fontWeight: 700, fontSize: 14, color: "var(--navy)" }}>
-                    {p.prod_name}
-                  </span>
-                  <span
-                    className="badge"
-                    style={{
-                      fontSize: 10,
-                      padding: "2px 9px",
-                      background: p.prod_available ? "#dcfce7" : "#fee2e2",
-                      color: p.prod_available ? "var(--success)" : "var(--danger)",
-                    }}
-                  >
-                    {p.prod_available ? "Available" : "Unavailable"}
-                  </span>
-                </div>
-                <p
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                    margin: 0,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    maxWidth: 340,
-                  }}
-                >
-                  {p.prod_desc ?? "No description"}
-                </p>
-                {p.shelf_life && (
-                  <span style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, display: "block", opacity: 0.7 }}>
-                    Shelf life: {p.shelf_life}
-                  </span>
-                )}
-              </div>
-
-              {/* Price */}
-              <div
-                style={{
-                  fontWeight: 800,
-                  fontSize: 17,
-                  color: "var(--navy)",
-                  minWidth: 80,
-                  textAlign: "right",
-                  flexShrink: 0,
-                }}
-              >
-                ₱{p.prod_price != null ? Number(p.prod_price).toFixed(2) : "0.00"}
-                <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 400, marginTop: 1 }}>
-                  per cookie
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                <button
-                  onClick={() => { setEditing(p); setShowForm(true); }}
-                  className="btn btn-secondary"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(p.prod_id)}
-                  className="btn btn-danger"
-                >
-                  Delete
-                </button>
-              </div>
+      <div className="card">
+        {loading && <div className="spinner" />}
+        {!loading && (
+          <>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Customer ID</th>
+                    <th>Full Name</th>
+                    <th>Email Address</th>
+                    <th>Contact No.</th>
+                    <th>Provider</th>
+                    <th>Created Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((c) => (
+                    <tr key={c.cust_id}>
+                      <td style={{ color: "var(--text-muted)", fontSize: 11, fontFamily: "monospace" }}>
+                        {String(c.cust_id).slice(0, 8)}…
+                      </td>
+                      <td style={{ fontWeight: 600 }}>
+                        {c.cust_lastname}, {c.cust_firstname}
+                        {c.cust_middlename ? ` ${c.cust_middlename[0]}.` : ""}
+                      </td>
+                      <td>{c.cust_email}</td>
+                      <td>{c.cust_cont_no || "—"}</td>
+                      <td style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                        {c.cust_social_provider ?? "—"}
+                      </td>
+                      <td style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                        {c.cust_cd && !isNaN(Date.parse(c.cust_cd))
+                          ? new Date(c.cust_cd).toLocaleDateString("en-PH")
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={6}>
+                        <div className="empty-state"><p>No customers found</p></div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          ))}
-
-          {filtered.length === 0 && (
-            <div className="empty-state" style={{ padding: "60px 0", fontSize: 14 }}>
-              <div style={{ fontSize: 36, marginBottom: 10 }}>🍪</div>
-              No products found
-            </div>
-          )}
-        </div>
-      )}
+            {total > 20 && (
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+                <button className="btn btn-secondary" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>← Prev</button>
+                <span style={{ lineHeight: "36px", fontSize: 12, color: "var(--text-muted)" }}>Page {page}</span>
+                <button className="btn btn-secondary" disabled={page * 20 >= total} onClick={() => setPage((p) => p + 1)}>Next →</button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
-// ─── Product Form Modal ───────────────────────────────────────────────────────
+// ─── Customer Form Modal ──────────────────────────────────────────────────────
+// Matches backend CustomerCreate / CustomerBase field names exactly
 
-function ProductForm({
-  initial,
-  onClose,
-  onSaved,
-}: {
-  initial: Product | null;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
+function CustomerForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
-    prod_name: initial?.prod_name ?? "",
-    prod_desc: initial?.prod_desc ?? "",
-    prod_price: initial?.prod_price ?? 0,
-    prod_available: initial?.prod_available ?? true,
-    shelf_life: initial?.shelf_life ?? "",
+    cust_firstname: "",
+    cust_lastname: "",
+    cust_middlename: "",
+    cust_email: "",
+    cust_cont_no: "",
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
   const handleSave = async () => {
-    if (!form.prod_name || form.prod_price < 0) {
-      setErr("Name and a valid price are required.");
+    if (!form.cust_firstname || !form.cust_lastname || !form.cust_email) {
+      setErr("First name, last name, and email are required.");
       return;
     }
     setSaving(true);
     try {
-      if (initial) {
-        await productsApi.update(initial.prod_id, form);
-      } else {
-        await productsApi.create(form);
-      }
+      await customersApi.create({
+        cust_firstname: form.cust_firstname,
+        cust_lastname: form.cust_lastname,
+        cust_middlename: form.cust_middlename || undefined,
+        cust_email: form.cust_email,
+        cust_cont_no: form.cust_cont_no || undefined,
+      });
       onSaved();
       onClose();
     } catch (e) {
@@ -263,81 +157,43 @@ function ProductForm({
     }
   };
 
+  const f = (key: keyof typeof form) => ({
+    className: "form-input",
+    value: form[key],
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: e.target.value }),
+  });
+
   return (
     <div style={overlay}>
       <div style={modal}>
-        <h3 style={{ fontSize: 22, color: "var(--navy)", marginBottom: 22, letterSpacing: "-0.3px" }}>
-          {initial ? "Edit Product" : "New Product"}
-        </h3>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <h3 style={{ marginBottom: 16, fontSize: 16, color: "var(--navy)" }}>New Customer</h3>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="form-group">
+              <label className="form-label">First Name *</label>
+              <input {...f("cust_firstname")} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Last Name *</label>
+              <input {...f("cust_lastname")} />
+            </div>
+          </div>
           <div className="form-group">
-            <label className="form-label">Product Name *</label>
-            <input className="form-input" value={form.prod_name} onChange={(e) => setForm({ ...form, prod_name: e.target.value })} />
+            <label className="form-label">Middle Name</label>
+            <input {...f("cust_middlename")} />
           </div>
-
           <div className="form-group">
-            <label className="form-label">Description</label>
-            <textarea
-              className="form-textarea"
-              style={{ resize: "vertical" }}
-              rows={3}
-              value={form.prod_desc}
-              onChange={(e) => setForm({ ...form, prod_desc: e.target.value })}
-            />
+            <label className="form-label">Email *</label>
+            <input {...f("cust_email")} type="email" />
           </div>
-
-          <div style={{ display: "flex", gap: 12 }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Price (₱) *</label>
-              <input
-                className="form-input"
-                type="number"
-                min={0}
-                step={0.01}
-                value={form.prod_price}
-                onChange={(e) => setForm({ ...form, prod_price: Number(e.target.value) })}
-              />
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Shelf Life</label>
-              <input
-                className="form-input"
-                value={form.shelf_life}
-                placeholder="e.g. 3 days"
-                onChange={(e) => setForm({ ...form, shelf_life: e.target.value })}
-              />
-            </div>
+          <div className="form-group">
+            <label className="form-label">Contact Number</label>
+            <input {...f("cust_cont_no")} placeholder="09xxxxxxxxx (+63 format)" />
           </div>
-
-          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={form.prod_available}
-              onChange={(e) => setForm({ ...form, prod_available: e.target.checked })}
-            />
-            <div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--navy)" }}>Available for ordering</span>
-              <p style={{ fontSize: 11, color: "var(--text-muted)", margin: 0 }}>
-                When enabled, this product appears in the customer order page
-              </p>
-            </div>
-          </label>
-
-          {err && <p style={{ color: "var(--danger)", fontSize: 12, margin: 0 }}>{err}</p>}
-
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 4 }}>
-            <button
-              onClick={onClose}
-              className="btn btn-secondary"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="btn btn-primary"
-            >
+          {err && <p style={{ color: "#c0392b", fontSize: 12 }}>{err}</p>}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
               {saving ? "Saving…" : "Save"}
             </button>
           </div>
@@ -347,26 +203,10 @@ function ProductForm({
   );
 }
 
-// ─── Shared configurations ───────────────────────────────────────────────────
-
 const overlay: React.CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(13,18,64,0.35)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 200,
-  backdropFilter: "blur(2px)",
+  position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200,
 };
-
 const modal: React.CSSProperties = {
-  background: "var(--warm-white)",
-  borderRadius: 20,
-  padding: 30,
-  width: "100%",
-  maxWidth: 460,
-  maxHeight: "90vh",
-  overflowY: "auto",
-  boxShadow: "0 20px 60px rgba(13,18,64,0.15)",
+  background: "#fff", borderRadius: 14, padding: 28, width: "100%", maxWidth: 500,
 };
