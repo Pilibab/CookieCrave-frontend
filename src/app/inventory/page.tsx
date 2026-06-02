@@ -5,34 +5,16 @@ import { useFetch } from "@/hooks/useFetch";
 import { inventoryApi, UnitType } from "@/lib/api";
 import type { InventoryItem } from "@/types/mytypes";
 
-
-
 const UOM_OPTIONS: UnitType[] = ["pcs", "ml", "g", "kg"];
 const FILTERS = ["All", "OK", "Low", "Critical"];
 
-// Unit conversion table — convert FROM any unit TO any unit
-// Strategy: convert everything to a base SI unit first, then to target
-const TO_BASE: Record<UnitType, number> = {
-  pcs: 1,
-  ml: 0.001,   // base: liters
-  g: 0.001,    // base: kg
-  kg: 1,
-};
-
-// Which "dimension" each unit belongs to so we only convert within the same family
-const DIMENSION: Record<UnitType, string> = {
-  pcs: "count",
-  ml: "volume",
-  g: "mass",
-  kg: "mass",
-};
+const TO_BASE: Record<UnitType, number> = { pcs: 1, ml: 0.001, g: 0.001, kg: 1 };
+const DIMENSION: Record<UnitType, string> = { pcs: "count", ml: "volume", g: "mass", kg: "mass" };
 
 function convertUnit(value: number, from: UnitType, to: UnitType): number {
   if (from === to) return value;
-  if (DIMENSION[from] !== DIMENSION[to]) return value; // incompatible — show raw
-  // Convert from → base → to
-  const baseValue = value * TO_BASE[from];
-  return baseValue / TO_BASE[to];
+  if (DIMENSION[from] !== DIMENSION[to]) return value;
+  return (value * TO_BASE[from]) / TO_BASE[to];
 }
 
 // ─── Inventory Form ────────────────────────────────────────────────────────────
@@ -46,23 +28,21 @@ function InventoryForm({
   onSaved: () => void;
 }) {
   const isEditing = initial !== null;
-  const [name, setName] = useState(initial?.inv_ing_name ?? "");
-  const [stock, setStock] = useState<number>(initial?.inv_stock ?? 0);
-  const [uom, setUom] = useState<UnitType>((initial?.inv_uom as UnitType) ?? "pcs");
-  const [rt, setRt] = useState<number>(initial?.inv_rt ?? 0);
+
+  const [name, setName]               = useState(initial?.inv_ing_name ?? "");
+  const [stock, setStock]             = useState<number>(initial?.inv_stock ?? 0);
+  const [uom, setUom]                 = useState<UnitType>((initial?.inv_uom as UnitType) ?? "pcs");
+  const [rt, setRt]                   = useState<number>(initial?.inv_rt ?? 0);
   const [adjustAmount, setAdjustAmount] = useState<number>(0);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]           = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
     try {
       if (isEditing && initial) {
-        // Use /update/{inv_id} endpoint via inventoryApi — adjust stock if amount changed
         if (adjustAmount !== 0) {
           await inventoryApi.adjustStock(initial.inv_id, adjustAmount);
         }
-        // Also update name / uom / rt using the update endpoint your groupmate added
-        // Mapped to PUT /inventory/{inv_id} (or /update/{inv_id} per your groupmate)
         await (inventoryApi as any).update(initial.inv_id, {
           inv_ing_name: name,
           inv_uom: uom,
@@ -79,7 +59,18 @@ function InventoryForm({
       onSaved();
       onClose();
     } catch (err: any) {
-      alert(err?.message ?? "Failed to save ingredient.");
+      let msg = "Unknown error";
+      try {
+        if (typeof err === "string") msg = err;
+        else if (err instanceof Error) msg = err.message;
+        else {
+          const detail = err?.detail ?? err?.message ?? err?.error;
+          msg = detail !== undefined
+            ? (typeof detail === "string" ? detail : JSON.stringify(detail))
+            : JSON.stringify(err, Object.getOwnPropertyNames(err)) ?? String(err);
+        }
+      } catch { try { msg = String(err); } catch { msg = "Unserializable error"; } }
+      alert(`Failed to save ingredient:\n${msg}`);
     } finally {
       setSaving(false);
     }
@@ -93,6 +84,7 @@ function InventoryForm({
           <button style={modalCloseBtnStyle} onClick={onClose}>✕</button>
         </div>
 
+        {/* Ingredient Name */}
         <div style={fieldGroupStyle}>
           <label style={labelStyle}>Ingredient Name</label>
           <input
@@ -103,6 +95,7 @@ function InventoryForm({
           />
         </div>
 
+        {/* Initial Stock — only when creating */}
         {!isEditing && (
           <div style={fieldGroupStyle}>
             <label style={labelStyle}>Initial Stock</label>
@@ -116,6 +109,7 @@ function InventoryForm({
           </div>
         )}
 
+        {/* Adjust Stock — only when editing */}
         {isEditing && (
           <div style={fieldGroupStyle}>
             <label style={labelStyle}>Adjust Stock (+ to restock, − to deduct)</label>
@@ -127,11 +121,17 @@ function InventoryForm({
               placeholder="0"
             />
             <p style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
-              Current stock: <strong style={{ color: "#FFFFFF" }}>{initial?.inv_stock ?? 0} {initial?.inv_uom}</strong>
+              Current stock:{" "}
+              <strong style={{ color: "#FFFFFF" }}>
+                {initial?.inv_stock ?? 0} {initial?.inv_uom}
+              </strong>
               {adjustAmount !== 0 && (
-                <> → New: <strong style={{ color: adjustAmount > 0 ? "#bbf7d0" : "#fca5a5" }}>
-                  {Math.max(0, (initial?.inv_stock ?? 0) + adjustAmount)} {uom}
-                </strong></>
+                <>
+                  {" "}→ New:{" "}
+                  <strong style={{ color: adjustAmount > 0 ? "#bbf7d0" : "#fca5a5" }}>
+                    {Math.max(0, (initial?.inv_stock ?? 0) + adjustAmount)} {uom}
+                  </strong>
+                </>
               )}
             </p>
           </div>
@@ -140,11 +140,7 @@ function InventoryForm({
         <div style={{ display: "flex", gap: "12px" }}>
           <div style={{ ...fieldGroupStyle, flex: 1 }}>
             <label style={labelStyle}>Unit of Measure</label>
-            <select
-              style={inputStyle}
-              value={uom}
-              onChange={(e) => setUom(e.target.value as UnitType)}
-            >
+            <select style={inputStyle} value={uom} onChange={(e) => setUom(e.target.value as UnitType)}>
               {UOM_OPTIONS.map((u) => (
                 <option key={u} value={u} style={{ background: "#141210", color: "#fff" }}>{u}</option>
               ))}
@@ -164,7 +160,15 @@ function InventoryForm({
 
         <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "8px" }}>
           <button style={cancelBtnStyle} onClick={onClose} disabled={saving}>Cancel</button>
-          <button style={saveBtnStyle} onClick={handleSave} disabled={saving}>
+          <button
+            style={{
+              ...saveBtnStyle,
+              opacity: !name ? 0.5 : 1,
+              cursor: !name ? "not-allowed" : "pointer",
+            }}
+            onClick={handleSave}
+            disabled={saving || !name}
+          >
             {saving ? "Saving..." : isEditing ? "Save Changes" : "Add Ingredient"}
           </button>
         </div>
@@ -176,21 +180,21 @@ function InventoryForm({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function InventoryPage() {
   const { data: items, loading, refetch } = useFetch<InventoryItem[]>(inventoryApi.list);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<InventoryItem | null>(null);
-  const [activeFilter, setActiveFilter] = useState("All");
-  const [displayUnits, setDisplayUnits] = useState<Record<number, UnitType>>({});
+  const [showForm, setShowForm]           = useState(false);
+  const [editing, setEditing]             = useState<InventoryItem | null>(null);
+  const [activeFilter, setActiveFilter]   = useState("All");
+  const [displayUnits, setDisplayUnits]   = useState<Record<number, UnitType>>({});
 
-  const isLow = (item: InventoryItem) => (item.inv_stock ?? 0) <= (item.inv_rt ?? 0);
+  const isLow      = (item: InventoryItem) => (item.inv_stock ?? 0) <= (item.inv_rt ?? 0);
   const isCritical = (item: InventoryItem) => (item.inv_stock ?? 0) <= (item.inv_rt ?? 0) * 0.5;
 
   const allItems = items ?? [];
 
   const filtered = allItems.filter((item) => {
-    if (activeFilter === "All") return true;
+    if (activeFilter === "All")      return true;
     if (activeFilter === "Critical") return isCritical(item);
-    if (activeFilter === "Low") return isLow(item) && !isCritical(item);
-    if (activeFilter === "OK") return !isLow(item);
+    if (activeFilter === "Low")      return isLow(item) && !isCritical(item);
+    if (activeFilter === "OK")       return !isLow(item);
     return true;
   });
 
@@ -214,14 +218,9 @@ export default function InventoryPage() {
               )}
             </p>
           </div>
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <button
-              style={primaryBtnStyle}
-              onClick={() => { setEditing(null); setShowForm(true); }}
-            >
-              + New Ingredient
-            </button>
-          </div>
+          <button style={primaryBtnStyle} onClick={() => { setEditing(null); setShowForm(true); }}>
+            + New Ingredient
+          </button>
         </div>
 
         <main style={mainGlassPanelStyle}>
@@ -257,12 +256,12 @@ export default function InventoryPage() {
                 </thead>
                 <tbody>
                   {filtered.map((item) => {
-                    const stock = item.inv_stock ?? 0;
+                    const stock         = item.inv_stock ?? 0;
                     const reorderTrigger = item.inv_rt ?? 0;
-                    const maxVal = (item as any).inv_max ?? (reorderTrigger * 2 || 10);
-                    const pct = (stock / Math.max(maxVal, stock, 1)) * 100;
+                    const maxVal        = (item as any).inv_max ?? (reorderTrigger * 2 || 10);
+                    const pct           = (stock / Math.max(maxVal, stock, 1)) * 100;
 
-                    const storedUnit = (item.inv_uom as UnitType) || "pcs";
+                    const storedUnit  = (item.inv_uom as UnitType) || "pcs";
                     const currentUnit = displayUnits[item.inv_id] || storedUnit;
                     const convertedQty = convertUnit(stock, storedUnit, currentUnit);
 
@@ -278,7 +277,7 @@ export default function InventoryPage() {
                               width: `${Math.min(pct, 100)}%`,
                               height: "100%",
                               backgroundColor: isCritical(item) ? "#fca5a5" : isLow(item) ? "#fde68a" : "#bbf7d0",
-                              transition: "width 0.4s ease"
+                              transition: "width 0.4s ease",
                             }} />
                           </div>
                         </td>
@@ -290,9 +289,7 @@ export default function InventoryPage() {
                             </span>
                             <select
                               value={currentUnit}
-                              onChange={(e) =>
-                                setDisplayUnits({ ...displayUnits, [item.inv_id]: e.target.value as UnitType })
-                              }
+                              onChange={(e) => setDisplayUnits({ ...displayUnits, [item.inv_id]: e.target.value as UnitType })}
                               style={tableSelectStyle}
                             >
                               {UOM_OPTIONS.map((u) => (
@@ -322,7 +319,7 @@ export default function InventoryPage() {
                             gap: "5px",
                             textTransform: "uppercase",
                             letterSpacing: "0.5px",
-                            border: `1px solid ${isCritical(item) ? "#fecaca" : isLow(item) ? "#fde68a" : "#bbf7d0"}22`
+                            border: `1px solid ${isCritical(item) ? "#fecaca" : isLow(item) ? "#fde68a" : "#bbf7d0"}22`,
                           }}>
                             {isCritical(item) ? "Critical" : isLow(item) ? "Low" : "OK"}
                           </span>
@@ -388,8 +385,6 @@ const tdStyle: React.CSSProperties = { padding: "12px", fontSize: "13px", color:
 const tableSelectStyle: React.CSSProperties = { border: "1px solid rgba(255,255,255,0.15)", borderRadius: "3px", padding: "2px 4px", fontSize: "11px", backgroundColor: "rgba(20,18,16,0.9)", outline: "none", color: "#94a3b8", cursor: "pointer" };
 const editActionBtnStyle: React.CSSProperties = { backgroundColor: "transparent", color: "#FFFFFF", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "3px", padding: "4px 10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" };
 const statusMessageStyle: React.CSSProperties = { textAlign: "center", padding: "24px", fontSize: "13px", color: "#64748b" };
-
-// Modal styles
 const modalOverlayStyle: React.CSSProperties = { position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" };
 const modalStyle: React.CSSProperties = { backgroundColor: "#141210", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "28px", width: "100%", maxWidth: "480px", display: "flex", flexDirection: "column", gap: "16px", boxShadow: "0 25px 50px rgba(0,0,0,0.6)" };
 const modalHeaderStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center" };

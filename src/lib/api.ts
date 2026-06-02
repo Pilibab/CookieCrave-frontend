@@ -32,8 +32,18 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     
     try {
       const errorJson = JSON.parse(rawText);
-      // FastAPI/Uvicorn validation errors standardly use 'detail'
-      errorMessage = errorJson.detail || errorJson.message || errorMessage;
+      const detail = errorJson.detail ?? errorJson.message;
+
+      if (typeof detail === "string") {
+        errorMessage = detail;
+      } else if (Array.isArray(detail)) {
+        // FastAPI 422 validation errors — array of { loc, msg, type }
+        errorMessage = detail
+          .map((e: any) => e.loc?.slice(1).join(" -> ") + ": " + e.msg)
+          .join("; ");
+      } else if (detail) {
+        errorMessage = JSON.stringify(detail);
+      }
     } catch {
       if (rawText) errorMessage = rawText;
     }
@@ -57,7 +67,6 @@ export const authApi = {
 // PUT    /api/customers/{customer_id}
 // DELETE /api/customers/{customer_id}
 export const customersApi = {
-  // FIXED: No pagination arguments, no query string, strictly returns Customer array
   list: () => request<import("@/types/mytypes").Customer[]>("/customers"),
   
   get: (id: string) => 
@@ -97,7 +106,6 @@ export const productsApi = {
   },
   
   get: (id: number) => 
-    // IS_MOCK ? getMock().mockProductsApi.get(id): 
     request<import("@/types/mytypes").Product>(`/products/${id}`),
   create: (body: Partial<import("@/types/mytypes").Product>) => request<import("@/types/mytypes").Product>("/products", { method: "POST", body: JSON.stringify(body) }),
   update: (id: number, body: Partial<import("@/types/mytypes").Product>) => request<import("@/types/mytypes").Product>(`/products/${id}`, { method: "PUT", body: JSON.stringify(body) }),
@@ -206,6 +214,16 @@ export const inventoryApi = {
     inv_rt?: number;
   }) => request<import("@/types/mytypes").InventoryItem>("/inventory", {
           method: "POST",
+          body: JSON.stringify(body),
+        }),
+
+  // PUT /inventory/{inv_id} — update name, uom, reorder trigger
+  update: (id: number, body: {
+    inv_ing_name?: string;
+    inv_uom?: UnitType;
+    inv_rt?: number;
+  }) => request<import("@/types/mytypes").InventoryItem>(`/inventory/${id}`, {
+          method: "PUT",
           body: JSON.stringify(body),
         }),
 
