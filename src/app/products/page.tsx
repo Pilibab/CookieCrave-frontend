@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useFetch } from "@/hooks/useFetch";
 import { productsApi } from "@/lib/api";
-import type { Product } from "@/types";
+import type { Product } from "@/types/mytypes";
 
 export default function ProductsPage() {
   const { data: products, loading, error, refetch } =

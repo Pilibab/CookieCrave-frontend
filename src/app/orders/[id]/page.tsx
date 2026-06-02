@@ -1,23 +1,67 @@
 "use client";
 
 import { useFetch, useMutation } from "@/hooks/useFetch";
-import { ordersApi } from "@/lib/api";
+import { ordersApi, customersApi, fulfillmentApi, deliveryApi, pickupApi, cartApi, productsApi} from "@/lib/api";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { OrderStatus } from "@/types/mytypes";
 
 const STATUS_FLOW: OrderStatus[] = [
-  "Pending", "Confirmed", "Baking", "Out for Delivery", "For Pickup", "Completed",
+  "Pending", "Confirmed", "Baking", "Out for Delivery", "For Pickup", "Completed", "Cancelled"
 ];
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const orderId = Number(id);
 
-  const { data: order, loading, error, refetch } = useFetch(
-    () => ordersApi.get(orderId),
-    [orderId]
-  );
+  // ─── SINGLE UNIFIED FETCH CALL ─────────────────────────────────────────────
+  const { data: pageData, loading, error, refetch } = useFetch(async () => {
+    // 1. Fetch the core order details
+    const orderData = await ordersApi.get(orderId);
+
+    // 2. Fetch basic related collections concurrently
+    const [customerData, fulfillmentData, cartItems] = await Promise.all([
+      customersApi.get(String(orderData.cust_id)),
+      fulfillmentApi.get(orderData.fulfillment_id),
+      cartApi.getByOrder(orderData.ord_id),
+    ]);
+
+    // 3. Fetch specific sub-fulfillment records conditionally based on type
+    let deliveryData = null;
+    let pickupData = null;
+
+    if (fulfillmentData.fulfillment_type === "Delivery") {
+      deliveryData = await deliveryApi.get(orderData.fulfillment_id);
+    } else if (fulfillmentData.fulfillment_type === "Pick_Up") {
+      pickupData = await pickupApi.get(orderData.fulfillment_id);
+    }
+
+    // 4. Hydrate the cart line items with product descriptions concurrently
+    const hydratedCart = await Promise.all(
+      cartItems.map(async (item) => {
+        try {
+          const productInfo = await productsApi.get(item.prod_id);
+          return {
+            ...item,
+            product: productInfo, // Injected product object safely inside the array loop
+          };
+        } catch (err) {
+          console.error(`Failed to hydrate product info for ID ${item.prod_id}:`, err);
+          return { ...item, product: null };
+        }
+      })
+    );
+
+    // Return the single consolidated state payload
+    return {
+      order: orderData,
+      customer: customerData,
+      fulfillment: fulfillmentData,
+      delivery: deliveryData,
+      pickup: pickupData,
+      cart: hydratedCart,
+    };
+  }, [orderId]);
 
   const { mutate: updateStatus, loading: updating } = useMutation(
     (status: OrderStatus) => ordersApi.updateStatus(orderId, status)
@@ -25,24 +69,25 @@ export default function OrderDetailPage() {
 
   const handleStatusChange = async (status: OrderStatus) => {
     await updateStatus(status);
-    refetch();
+    refetch(); // This cleanly re-runs the entire aggregated data tree
   };
 
   if (loading) return <div className="page-body"><div className="spinner" /></div>;
-  if (error || !order) return <div className="page-body"><p style={{ color: "red" }}>Order not found.</p></div>;
+  if (error || !pageData) return <div className="page-body"><p style={{ color: "red" }}>Order data could not be parsed.</p></div>;
 
+  const { order, customer, fulfillment, delivery, pickup, cart } = pageData;
   const currentIdx = STATUS_FLOW.indexOf(order.order_status as OrderStatus);
-
+  
   return (
     <div className="page-body">
       <div className="page-header">
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Link href="/orders" style={{ color: "#6b6f8a", fontSize: 14 }}>← Orders</Link>
-          <h1 className="page-title">Order #{order.order_id}</h1>
+          <h1 className="page-title">Order #{order.ord_id}</h1>
         </div>
-        <span style={{ fontSize: 13, color: "#6b6f8a" }}>
-          Invoice: {order.invoice ? `#${order.invoice.invoice_id}` : "Pending"}
-        </span>
+        {/* <span style={{ fontSize: 13, color: "#6b6f8a" }}>
+          Invoice: {order.invoice ? `#${order.invoice.invoice_id}` : "Pending"}     no invoice
+        </span> */}
       </div>
 
       {/* Status stepper */}
@@ -94,16 +139,18 @@ export default function OrderDetailPage() {
         {/* Customer info */}
         <div className="card">
           <h3 style={{ fontSize: 15, marginBottom: 14 }}>Customer</h3>
-          {order.customer ? (
+          {customer ? (
             <dl style={dl}>
               <dt>Name</dt>
-              <dd>{order.customer.given_name} {order.customer.middle_name ?? ""} {order.customer.last_name} {order.customer.suffix ?? ""}</dd>
+              <dd>{customer.cust_firstname} {customer.cust_middlename ?? ""} {customer.cust_lastname}</dd>
               <dt>Email</dt>
-              <dd>{order.customer.email}</dd>
+              <dd>{customer.cust_email}</dd>
               <dt>Contact</dt>
-              <dd>{order.customer.contact_num ?? "—"}</dd>
+              <dd>{customer.cust_cont_no ?? "—"}</dd>
             </dl>
-          ) : <p style={{ color: "#6b6f8a" }}>Customer #{order.customer_id}</p>}
+          ) : <p style={{ color: "#6b6f8a" }}>
+            {/* {should customer be null then dont display info }  */}
+            No info </p>}
         </div>
 
         {/* Fulfillment info */}
@@ -111,29 +158,29 @@ export default function OrderDetailPage() {
           <h3 style={{ fontSize: 15, marginBottom: 14 }}>Fulfillment</h3>
           <dl style={dl}>
             <dt>Type</dt>
-            <dd>{order.fulfillment?.fulfillment_type ?? "—"}</dd>
-            {order.fulfillment?.fulfillment_type === "Delivery" && order.fulfillment.delivery && (
+            <dd>{fulfillment?.fulfillment_type ?? "—"}</dd>
+            {fulfillment?.fulfillment_type  === "Delivery" && delivery && (
               <>
                 <dt>Address</dt>
-                <dd>{order.fulfillment.delivery.address}</dd>
-                {order.fulfillment.delivery.floor_unit_num && (
-                  <><dt>Unit/Floor</dt><dd>{order.fulfillment.delivery.floor_unit_num}</dd></>
+                <dd>{delivery.address}</dd>
+                {delivery.floor_unit_num && (
+                  <><dt>Unit/Floor</dt><dd>{delivery.floor_unit_num}</dd></>
                 )}
-                {order.fulfillment.delivery.note && (
-                  <><dt>Note</dt><dd>{order.fulfillment.delivery.note}</dd></>
+                {delivery.note && (
+                  <><dt>Note</dt><dd>{delivery.note}</dd></>
                 )}
               </>
             )}
-            {order.fulfillment?.fulfillment_type === "Pick_Up" && order.fulfillment.pick_up && (
+            {fulfillment?.fulfillment_type  === "Pick_Up" && pickup && (
               <>
                 <dt>Preferred Time</dt>
-                <dd>{order.fulfillment.pick_up.preferred_time ?? "—"}</dd>
+                <dd>{pickup.preferred_time ?? "—"}</dd>
                 <dt>Pick-up Location</dt>
-                <dd>{order.fulfillment.pick_up.pick_up_location ?? "—"}</dd>
+                <dd>{pickup.pick_up_location ?? "—"}</dd>
               </>
             )}
             <dt>Payment</dt>
-            <dd>{order.payment_method}</dd>
+            <dd>{order.ord_pay_meth}</dd>
             <dt>Total</dt>
             <dd style={{ fontWeight: 700, fontSize: 16 }}>
               ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
@@ -155,24 +202,32 @@ export default function OrderDetailPage() {
                 <th>Subtotal</th>
               </tr>
             </thead>
-            <tbody>
-              {(order.cart_items ?? []).map((item) => (
-                <tr key={item.product_id}>
-                  <td>{item.product?.product_name ?? `Product #${item.product_id}`}</td>
-                  <td>₱{Number(item.price_per_item).toFixed(2)}</td>
-                  <td>{item.quantity}</td>
-                  <td style={{ fontWeight: 600 }}>
-                    ₱{(item.price_per_item * item.quantity).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+              <tbody>
+                {(cart ?? []).map((item) => {
+                  // 1. Safely extract values with safe numeric fallbacks to satisfy TypeScript
+                  const price = item.product?.prod_price ?? 0;
+                  const quantity = item.cart_quan ?? 0;
+                  const subtotal = price * quantity;
+
+                  return (
+                    <tr key={item.prod_id}>
+                      {/* Access the hydrated product object properties safely */}
+                      <td>{item.product?.prod_name ?? `Product #${item.prod_id}`}</td>
+                      <td>₱{price.toFixed(2)}</td>
+                      <td>{quantity}</td>
+                      <td style={{ fontWeight: 600 }}>
+                        ₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr>
+                  <td colSpan={3} style={{ textAlign: "right", fontWeight: 700 }}>Total</td>
+                  <td style={{ fontWeight: 700, fontSize: 16 }}>
+                    ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
-              ))}
-              <tr>
-                <td colSpan={3} style={{ textAlign: "right", fontWeight: 700 }}>Total</td>
-                <td style={{ fontWeight: 700, fontSize: 16 }}>
-                  ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                </td>
-              </tr>
-            </tbody>
+              </tbody>
           </table>
         </div>
       </div>
@@ -186,3 +241,55 @@ const dl: React.CSSProperties = {
   gap: "6px 12px",
   fontSize: 14,
 };
+
+
+// ! ----------------- SCRATCH------------------
+  // ! retrieve order info 
+  // const { data: order, loading, error, refetch } = useFetch(
+  //   () => ordersApi.get(orderId),
+  //   [orderId]
+  // );
+
+  // const { mutate: updateStatus, loading: updating } = useMutation(
+  //   (status: OrderStatus) => ordersApi.updateStatus(orderId, status)
+  // );
+
+  // const handleStatusChange = async (status: OrderStatus) => {
+  //   await updateStatus(status);
+  //   refetch();
+  // };
+
+  // if (loading) return <div className="page-body"><div className="spinner" /></div>;
+  // if (error || !order) return <div className="page-body"><p style={{ color: "red" }}>Order not found.</p></div>;
+
+  // const currentIdx = STATUS_FLOW.indexOf(order.order_status as OrderStatus);
+
+  // // ! retrieve othe info but shit... dont i have the dashboard adapter? i think its just the same ahh.....
+  // const { data: customer, loading: cust_loading , error: cust_err, refetch: cust_refetch } = useFetch(
+  //   () => customersApi.get(order.cust_id),
+  //   [order.cust_id]
+  // );  
+  // const { data: fulfillment, loading: fullfillment_loading , error: fullfillment_err, refetch: fullfillment_refetch } = useFetch(
+  //   () => fulfillmentApi.get(order.fulfillment_id),
+  //   [order.fulfillment_id]
+  // );
+
+  // const { data: delivery, loading: delievery_loading , error: delievery_err, refetch: delievery_refetch } = useFetch(
+  //   () => deliveryApi.get(order.fulfillment_id),
+  //   [order.fulfillment_id]
+  // );  
+  // const { data: pickup, loading: pickup_loading , error: pickup_err, refetch: pickup_refetch } = useFetch(
+  //   () => pickupApi.get(order.fulfillment_id),
+  //   [order.fulfillment_id]
+  // );
+
+  // const { data: cart, loading: cart_loading , error: cart_err, refetch: cart_refetch } = useFetch(
+  //   () => cartApi.getByOrder(order.ord_id),
+  //   [order.ord_id]
+  // );
+
+  // const { data: product, loading: product_loading , error: product_err, refetch: product_refetch } = useFetch(
+  //   () => productsApp,
+  //   [order.ord_id]
+  // );
+  // If the ID is a number, cast it using String() so TypeScript is happy:
