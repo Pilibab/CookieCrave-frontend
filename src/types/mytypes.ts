@@ -52,6 +52,10 @@ export interface BOMEntry {
   inv_id: number;
   bom_quan_req: number;
 }
+export interface BOMBulkCreate {
+  prod_id: number;
+  ingredients: { inv_id: number; bom_quan_req: number }[];
+}
 
 // ─── Fulfillment ─────────────────────────────────────────────────────────────
 export type FulfillmentType = "Delivery" | "Pick_Up";

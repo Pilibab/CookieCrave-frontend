@@ -112,10 +112,6 @@ export const productsApi = {
 // DELETE /bom/{bom_id}
 // GET    /bom/product/{product_id}      — ingredients for a product
 // GET    /bom/ingredient/{inventory_id} — products using an ingredient
-export interface BOMBulkCreate {
-  prod_id: number;
-  ingredients: { inv_id: number; bom_quan_req: number }[];
-}
 
 export const bomApi = {
   list: () => request<import("@/types/mytypes").BOMEntry[]>("/bom"),
