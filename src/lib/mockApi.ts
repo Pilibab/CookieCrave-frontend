@@ -3,7 +3,7 @@ import {
   mockCustomers, mockProducts, mockInventory,
   mockLowStock, mockOrders, mockWeeklySummary, mockRiders, mockBomEntries,
 } from "./mockData";
-import type { OrderStatus, Fulfillment, Delivery, PickUp, BOMEntry, CartOrderLineItem } from "@/types/mytypes";
+import type { OrderStatus, Fulfillment, Delivery, PickUp, BOMEntry, CartOrderLineItem } from "@/types/index";
 
 const delay = <T>(val: T): Promise<T> =>
   new Promise((res) => setTimeout(() => res(val), 300));
@@ -13,7 +13,7 @@ export const mockCustomersApi = {
     data: mockCustomers.slice((page - 1) * limit, page * limit),
     total: mockCustomers.length, page, limit,
   }),
-  get: (id: number) => delay(mockCustomers.find((c) => c.customer_id === id) ?? mockCustomers[0]),
+  get: (id: string) => delay(mockCustomers.find((c) => c.customer_id === id) ?? mockCustomers[0]),
   create: (body: object) => delay({ ...mockCustomers[0], ...body, customer_id: 99, created_at: new Date().toISOString() }),
   update: (id: number, body: object) => delay({ ...mockCustomers[0], ...body }),
 };
@@ -74,7 +74,7 @@ export const mockOrdersApi = {
   update: (id: number, body: object) => delay({ ...mockOrders.find((o) => o.order_id === id) ?? mockOrders[0], ...body }),
   updateStatus: (id: number, status: OrderStatus) =>
     delay({ ...mockOrders.find((o) => o.order_id === id) ?? mockOrders[0], order_status: status }),
-  getByCustomer: (customerId: number) => delay(mockOrders.filter((o) => o.customer_id === customerId)),
+  getByCustomer: (customerId: string) => delay(mockOrders.filter((o) => o.customer_id === customerId)),
 };
 
 export const mockInventoryApi = {

@@ -22,7 +22,7 @@ export interface GCashPayment {
 }
 // ─── Customer ────────────────────────────────────────────────────────────────
 export interface Customer {
-  cust_id: number;
+  cust_id: string;
   cust_lastname: string;
   cust_firstname: string;
   cust_middlename?: string;
@@ -41,14 +41,7 @@ export interface Product {
   prod_available: boolean;
 }
 
-// ─── Inventory ───────────────────────────────────────────────────────────────
-export interface InventoryItem {
-  inv_id: number;
-  inv_ing_name: string;
-  inv_stock: number;
-  inv_uom: string;
-  inv_rt: number;
-}
+
 
 // ─── BOM ─────────────────────────────────────────────────────────────────────
 export interface BOMEntry {
@@ -91,7 +84,7 @@ export interface Rider {
 
 // ─── Order ───────────────────────────────────────────────────────────────────
 export type PaymentMethod = "Cash" | "GCash";
-export type OrderStatus = "Pending"| "Preparing"| "Out for Delivery"| "Completed"| "Cancelled";
+export type OrderStatus = "Pending"| "Confirmed"| "Baking"| "Out for Delivery"| "For Pickup"| "Completed"| "Cancelled";
 
 export interface Order {
   ord_id: number;
@@ -124,6 +117,16 @@ export interface WeeklySummary {
 
 export interface LowStockItem extends InventoryItem {
   is_low: boolean;
+}
+
+// ─── Inventory ───────────────────────────────────────────────────────────────
+// mytypes.ts
+export interface InventoryItem {
+  inv_id: number;
+  inv_ing_name: string;
+  inv_stock: number;
+  inv_uom: string;
+  inv_rt: number;
 }
 
 // ─── API Response Wrappers ───────────────────────────────────────────────────

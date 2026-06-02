@@ -9,7 +9,7 @@ export interface User {
 
 // ─── Customer ────────────────────────────────────────────────────────────────
 export interface Customer {
-  customer_id: number;
+  customer_id: string;
   last_name: string;
   given_name: string;
   middle_name?: string;
@@ -27,15 +27,7 @@ export interface Product {
   price: number;
   is_available: boolean;
   shelf_life?: string;
-}
-
-// ─── Inventory ───────────────────────────────────────────────────────────────
-export interface InventoryItem {
-  inventory_id: number;
-  ingredients_name: string;
-  current_stock: number;
-  unit_of_measure: string;
-  recorder_trigger: number;
+  image: string;
 }
 
 // ─── BOM ─────────────────────────────────────────────────────────────────────
@@ -83,12 +75,13 @@ export interface Rider {
 }
 
 // ─── Order ───────────────────────────────────────────────────────────────────
+// index.ts
 export type PaymentMethod = "Cash" | "GCash";
 export type OrderStatus = "Pending" | "Confirmed" | "Baking" | "Out for Delivery" | "For Pickup" | "Completed" | "Cancelled";
 
 export interface Order {
   order_id: number;
-  customer_id: number;
+  customer_id: string;
   fulfillment_id: number;
   order_time: string;
   total_amount: number;
@@ -129,6 +122,15 @@ export interface WeeklySummary {
 
 export interface LowStockItem extends InventoryItem {
   is_low: boolean;
+}
+
+// ─── Inventory ───────────────────────────────────────────────────────────────
+export interface InventoryItem {
+  inventory_id: number;
+  ingredients_name: string;
+  current_stock: number;
+  unit_of_measure: string;
+  recorder_trigger: number;
 }
 
 // ─── API Response Wrappers ───────────────────────────────────────────────────
