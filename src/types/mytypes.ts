@@ -63,7 +63,7 @@ export interface Fulfillment {
 
 export interface Delivery {
   fulfillment_id: number;
-  rider_id?: number;
+  rider_id?: string;
   address: string;
   contact_name?: string;
   contact_number?: string;
@@ -79,7 +79,7 @@ export interface PickUp {
 
 // ─── Rider ───────────────────────────────────────────────────────────────────
 export interface Rider {
-  rider_id: number;
+  rider_id: string;
   rider_name: string;
   rider_contact_num?: string;
 }
