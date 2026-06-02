@@ -2,23 +2,29 @@
 
 import { useState } from "react";
 import { useFetch } from "@/hooks/useFetch";
-import { ordersApi } from "@/lib/api";
+import { ordersApi, customersApi, fulfillmentApi } from "@/lib/api";
 import Link from "next/link";
-import type { OrderStatus, Order } from "@/types";
+// Added Customer and Fulfillment type imports to represent the complete form
+import type { OrderStatus, Order, Customer, Fulfillment } from "@/types/mytypes";
 
-// Backend statuses only — matches app/model/order.py
+const ITEMS_PER_PAGE = 20;
+
+// 1. Create a fallback-safe type that allows both raw and populated forms
+type HydratedOrder = Order & {
+  customer?: Customer | null;
+  fulfillment?: Fulfillment | null;
+};
+
 const STATUSES: OrderStatus[] = [
-  "Pending",
-  "Preparing",
-  "Out for Delivery",
-  "Completed",
-  "Cancelled",
+  "Pending", "Confirmed", "Baking", "Out for Delivery", "For Pickup", "Completed", "Cancelled"
 ];
 
 const statusBadge: Record<OrderStatus, { bg: string; color: string }> = {
   Pending:            { bg: "#fef9c3", color: "#854d0e" },
-  Preparing:          { bg: "#dbeafe", color: "#1e3a8a" },
+  Confirmed:          { bg: "#e0e7ff", color: "#3730a3" },
+  Baking:             { bg: "#dbeafe", color: "#1e3a8a" },
   "Out for Delivery": { bg: "#e0f2fe", color: "#0c4a6e" },
+  "For Pickup":       { bg: "#f3e8ff", color: "#581c87" },
   Completed:          { bg: "#dcfce7", color: "#14532d" },
   Cancelled:          { bg: "#fee2e2", color: "#7f1d1d" },
 };
@@ -27,15 +33,46 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [page, setPage] = useState(1);
 
-  // Backend GET /orders returns List[Order] (not paginated), but api.ts wraps with
-  // PaginatedResponse shape. Accept both to be safe.
-  const { data: raw, loading, error, refetch } = useFetch<Order[] | { data: Order[]; total: number }>(
-    () => ordersApi.list(page, 20, statusFilter || undefined) as unknown as Promise<Order[] | { data: Order[]; total: number }>,
-    [page, statusFilter]
+  // 2. Pass our custom type into useFetch so TypeScript expects the hydrated fields
+  const { data: rawOrders, loading, error } = useFetch<HydratedOrder[]>(
+    async () => {
+      const baseOrders = await ordersApi.list();
+
+      return Promise.all(
+        baseOrders.map(async (order) => {
+          try {
+            const [customerData, fulfillmentData] = await Promise.all([
+              customersApi.get(String(order.cust_id)).catch(() => null),
+              fulfillmentApi.get(order.fulfillment_id).catch(() => null),
+            ]);
+
+            return {
+              ...order,
+              // ord_f_type: fulfillmentData?.fulfillment_type,
+              customer: customerData,
+              fulfillment: fulfillmentData,
+            };
+          } catch (err) {
+            console.error(`Failed to hydrate details for order #${order.ord_id}:`, err);
+            return order; // Fallback: returns the raw order without relations if an API fails
+          }
+        })
+      );
+    },
+    []
   );
 
-  const orders: Order[] = Array.isArray(raw) ? raw : (raw as { data: Order[] } | null)?.data ?? [];
-  const total: number = Array.isArray(raw) ? raw.length : (raw as { total: number } | null)?.total ?? 0;
+  const allOrders = rawOrders ?? [];
+
+  const filteredOrders = statusFilter
+    ? allOrders.filter((order) => order.order_status === statusFilter)
+    : allOrders;
+
+  const total = filteredOrders.length;
+  const orders = filteredOrders.slice(
+    (page - 1) * ITEMS_PER_PAGE,
+    page * ITEMS_PER_PAGE
+  );
 
   return (
     <div className="page-body">
@@ -44,7 +81,6 @@ export default function OrdersPage() {
         <Link href="/orders/new" className="btn btn-primary">+ New Order</Link>
       </div>
 
-      {/* Status filter pills */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
         <button
           className={`btn ${statusFilter === "" ? "btn-primary" : "btn-secondary"}`}
@@ -98,9 +134,12 @@ export default function OrdersPage() {
                         <tr key={order.ord_id}>
                           <td style={{ fontWeight: 600 }}>#{order.ord_id}</td>
                           <td>
-                            {order.customer
-                              ? `${order.customer.cust_firstname} ${order.customer.cust_lastname}`
-                              : `Customer #${String(order.cust_id).slice(0, 8)}`}
+                            {/* 3. The fallback is safely handled here. If customer is undefined/null, it shows the ID */}
+                            {order.customer ? (
+                              `${order.customer.cust_firstname} ${order.customer.cust_lastname}`
+                            ) : (
+                              `Customer #${String(order.cust_id).slice(0, 8)}`
+                            )}
                           </td>
                           <td style={{ fontSize: 13, color: "#6b6f8a" }}>
                             {new Date(order.ord_time).toLocaleString("en-PH", {
@@ -108,7 +147,7 @@ export default function OrdersPage() {
                               hour: "2-digit", minute: "2-digit",
                             })}
                           </td>
-                          <td>{order.fulfillment?.fulfillment_type ?? order.ord_f_type ?? "—"}</td>
+                          <td>{order.fulfillment?.fulfillment_type ?? order.fulfillment?.fulfillment_type ?? "—"}</td>
                           <td>{order.ord_pay_meth}</td>
                           <td style={{ fontWeight: 600 }}>
                             ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
@@ -143,8 +182,7 @@ export default function OrdersPage() {
               </table>
             </div>
 
-            {/* Pagination */}
-            {total > 20 && (
+            {total > ITEMS_PER_PAGE && (
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
                 <button
                   className="btn btn-secondary"
@@ -154,11 +192,11 @@ export default function OrdersPage() {
                   ← Prev
                 </button>
                 <span style={{ lineHeight: "36px", fontSize: 13, color: "#6b6f8a" }}>
-                  Page {page} of {Math.ceil(total / 20)}
+                  Page {page} of {Math.ceil(total / ITEMS_PER_PAGE)}
                 </span>
                 <button
                   className="btn btn-secondary"
-                  disabled={page * 20 >= total}
+                  disabled={page * ITEMS_PER_PAGE >= total}
                   onClick={() => setPage((p) => p + 1)}
                 >
                   Next →
