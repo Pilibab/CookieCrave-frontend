@@ -1,9 +1,9 @@
-import Sidebar from "@/components/layout/Sidebar";
+import AdminNavbar from "@/components/layout/AdminNavbar";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="layout">
-      <Sidebar />
+      <AdminNavbar />
       <div className="main-content">{children}</div>
     </div>
   );

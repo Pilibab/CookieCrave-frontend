@@ -97,7 +97,7 @@ export async function fetchPendingOrders(
     const raw = await ordersApi.list();
     
     // Explicitly cast raw incoming data as your BackendOrder array
-    const ordersArray = (Array.isArray(raw) ? raw : raw?.data) as BackendOrder[];
+    const ordersArray = raw
 
     // FILTER STEP: Filter by statusFilter parameter if provided; default to "Pending" if empty
     const filteredRaw = statusFilter 

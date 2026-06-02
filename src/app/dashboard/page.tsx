@@ -6,7 +6,7 @@ import Link from "next/link";
 import { dashboardApi, inventoryDashboardApi } from "@/lib/adapters/dashboard.adapter";
 import type { OrderStatus, Order } from "@/types";
 
-// Unified Statuses list accommodating both frontend and backend configurations
+// Unified Statuses list
 const STATUSES: OrderStatus[] = [
   "Pending",
   "Confirmed",
@@ -27,25 +27,17 @@ const statusBadge: Record<OrderStatus, { bg: string; color: string }> = {
   Cancelled:          { bg: "#fee2e2", color: "#7f1d1d" },
 };
 
-// Simple inline styles fallback for missing dashboard design parameters
-const s = {
-  cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" },
-  viewAll: { color: "#c8883a", fontSize: "14px", fontWeight: 600, textDecoration: "none" },
-  summaryGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "24px" },
-  summaryCard: { padding: "16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }
-};
-
 export default function DashboardAndOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "">("");
   const [page, setPage] = useState(1);
 
-  // 1. Fetch Summary Statistics through the Adapter
+  // 1. Fetch Summary Statistics (User's Adapter)
   const { data: summary, loading: sumLoading } = useFetch(() => dashboardApi.weeklySummary());
 
-  // 2. Fetch Low Stock Alerts through the Adapter
+  // 2. Fetch Low Stock Alerts (User's Adapter)
   const { data: lowStock } = useFetch(inventoryDashboardApi.lowStock);
 
-  // 3. Dynamic Server Pagination Hook listening to Adapter conversions
+  // 3. Dynamic Server Pagination Hook (User's Adapter)
   const { data: paginatedData, loading: ordersLoading, error } = useFetch(
     () => dashboardApi.pendingOrders(page, 5, statusFilter || undefined),
     [page, statusFilter]
@@ -55,195 +47,257 @@ export default function DashboardAndOrdersPage() {
   const total: number = paginatedData?.total ?? 0;
 
   return (
-    <div className="page-body">
-      
-      {/* ─── WORK COMPONENT 1: WEEKLY OVERVIEW SUMMARY ─── */}
-      <div className="page-header">
-        <h1 className="page-title">Dashboard & Orders Management</h1>
-        <Link href="/orders/new" className="btn btn-primary">+ New Order</Link>
+    <div style={{
+      position: "relative",
+      minHeight: "calc(100vh - var(--navbar-h, 60px))",
+      // Changed from overflow: "hidden" to allow scrolling for the large table
+      overflowY: "auto", 
+      paddingBottom: "40px"
+    }}>
+      {/* ─── GROUP MATE'S BACKGROUND ─── */}
+      <div style={{
+        position: "fixed",
+        top: "var(--navbar-h, 60px)",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundImage: "url('/dashboard-bg.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center center",
+        backgroundColor: "#c8a882",
+        zIndex: 0,
+      }} />
+
+      {/* ─── GROUP MATE'S LOGO (Right Half) ─── */}
+      <div style={{
+        position: "fixed", // Changed to fixed so it stays put when scrolling down the table
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: "50%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        pointerEvents: "none",
+        zIndex: 1,
+      }}>
+        <img
+          src="/CKWebLogo.png"
+          alt="CookieKrave"
+          style={{ width: "70%", maxWidth: 380, objectFit: "contain" }}
+        />
       </div>
 
-      {!sumLoading && summary && (
-        <div style={s.summaryGrid}>
-          <div style={s.summaryCard}>
-            <p style={{ color: "#64748b", fontSize: 13, margin: 0 }}>Total Revenue</p>
-            <h3 style={{ fontSize: 24, margin: "4px 0 0 0" }}>
-              ₱{summary.total_revenue.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-            </h3>
+      {/* ─── MAIN CONTENT PANEL ─── */}
+      <div style={{
+        position: "relative",
+        zIndex: 2,
+        width: "90%", // Expanded width to fit the table, overriding group mate's 52%
+        maxWidth: "1200px",
+        padding: "0 24px 32px 28px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 24,
+      }}>
+
+        {/* ─── GROUP MATE'S HEADER ROW ─── */}
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginTop: 20 }}>
+          <div style={{
+            background: "var(--navy, #0f172a)",
+            borderRadius: "0 0 14px 14px",
+            padding: "20px 28px 14px 28px",
+            color: "#fff",
+            fontWeight: 800,
+            fontSize: 26,
+            boxShadow: "0 6px 20px rgba(13,18,64,0.22)",
+            lineHeight: 1,
+          }}>
+            Dashboard
           </div>
-          <div style={s.summaryCard}>
-            <p style={{ color: "#64748b", fontSize: 13, margin: 0 }}>Total Weekly Orders</p>
-            <h3 style={{ fontSize: 24, margin: "4px 0 0 0" }}>{summary.total_orders}</h3>
-          </div>
-          <div style={s.summaryCard}>
-            <p style={{ color: "#64748b", fontSize: 13, margin: 0 }}>Completed Orders</p>
-            <h3 style={{ fontSize: 24, margin: "4px 0 0 0", color: "#16a34a" }}>{summary.completed_orders}</h3>
+
+          <div style={{
+            background: "rgba(255,255,255,0.93)",
+            backdropFilter: "blur(8px)",
+            borderRadius: 999,
+            padding: "11px 28px",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            boxShadow: "0 3px 10px rgba(13,18,64,0.13)",
+          }}>
+            <span style={{ fontSize: 18, fontWeight: 700, color: "var(--navy, #0f172a)" }}>
+              {sumLoading ? "—" : summary?.total_orders ?? 0}
+            </span>
+            <span style={{ fontSize: 12, color: "var(--text-muted, #64748b)", fontWeight: 600 }}>
+              Total Orders this week
+            </span>
           </div>
         </div>
-      )}
 
-      {/* Status filter pills */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-        <button
-          className={`btn ${statusFilter === "" ? "btn-primary" : "btn-secondary"}`}
-          onClick={() => { setStatusFilter(""); setPage(1); }}
-        >
-          All Managed
-        </button>
-        {STATUSES.map((s) => (
-          <button
-            key={s}
-            className={`btn ${statusFilter === s ? "btn-primary" : "btn-secondary"}`}
-            onClick={() => { setStatusFilter(s); setPage(1); }}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+        {/* ─── GROUP MATE'S METRICS CARDS ─── */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, maxWidth: "800px" }}>
+          <div style={metricCard}>
+            <div style={metricVal}>{sumLoading ? "—" : summary?.completed_orders ?? 0}</div>
+            <div style={metricLabel}>Fulfilled Orders</div>
+            <Link href="/orders?status=Completed">
+              <button className="btn btn-secondary" style={{ marginTop: 12, fontSize: 12, padding: "4px 8px" }}>View</button>
+            </Link>
+          </div>
 
-      {/* ─── WORK COMPONENT 2: INTERCEPTED PAGINATED ORDERS TABLE ─── */}
-      <div className="card" style={{ marginBottom: 24 }}>
-        {ordersLoading && <div className="spinner" />}
-        {error && <p style={{ color: "red" }}>Error Loading Data: {error}</p>}
-        
-        {!ordersLoading && (
-          <>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Order ID</th>
-                    <th>Customer</th>
-                    <th>Date & Time</th>
-                    <th>Fulfillment</th>
-                    <th>Payment</th>
-                    <th>Total</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.length === 0 ? (
-                    <tr>
-                      <td colSpan={8}>
-                        <div className="empty-state">
-                          <p>No orders matched your current tracking parameters.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    orders.map((order) => {
-                      const badge = statusBadge[order.order_status] ?? { bg: "#f3f4f6", color: "#374151" };
-                      return (
-                        <tr key={order.order_id}>
-                          <td style={{ fontWeight: 600 }}>#{order.order_id}</td>
-                          <td>
-                            {order.customer
-                              ? `${order.customer.cust_firstname} ${order.customer.cust_lastname}`
-                              : `Customer #${String(order.customer_id).slice(0, 8)}`}
-                          </td>
-                          <td style={{ fontSize: 13, color: "#6b6f8a" }}>
-                            {new Date(order.order_time).toLocaleString("en-PH", {
-                              month: "short", day: "numeric",
-                              hour: "2-digit", minute: "2-digit",
-                            })}
-                          </td>
-                          <td>{order.fulfillment?.fulfillment_type ?? order.ord_f_type ?? "—"}</td>
-                          <td>{order.payment_method ?? "Cash"}</td>
-                          <td style={{ fontWeight: 600 }}>
-                            ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                          </td>
-                          <td>
-                            <span
-                              className="badge"
-                              style={{
-                                fontSize: 11,
-                                padding: "3px 10px",
-                                background: badge.bg,
-                                color: badge.color,
-                                fontWeight: 600,
-                                borderRadius: "4px"
-                              }}
-                            >
-                              {order.order_status}
-                            </span>
-                          </td>
-                          <td>
-                            <Link
-                              href={`/orders/${order.order_id}`}
-                              style={{ color: "#c8883a", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
-                            >
-                              View →
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+          <div style={metricCard}>
+            <div style={{ ...metricVal, fontSize: 20 }}>
+              {sumLoading ? "—" : `₱${Number(summary?.total_revenue ?? 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`}
             </div>
-
-            {/* Pagination Controls */}
-            {total > 5 && (
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-                <button
-                  className="btn btn-secondary"
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  ← Prev
-                </button>
-                <span style={{ lineHeight: "36px", fontSize: 13, color: "#6b6f8a" }}>
-                  Page {page} of {Math.ceil(total / 5)}
-                </span>
-                <button
-                  className="btn btn-secondary"
-                  disabled={page * 5 >= total}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next →
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* ─── WORK COMPONENT 3: LOW STOCK METRIC SECTION ─── */}
-      <div className="card">
-        <div style={s.cardHeader}>
-          <h3 style={{ fontSize: 16, margin: 0 }}>Low Stock Alerts</h3>
-          <Link href="/inventory" style={s.viewAll}>View all →</Link>
-        </div>
-        {!lowStock || lowStock.length === 0 ? (
-          <p style={{ color: "#27ae60", fontSize: 14, padding: "16px 0", margin: 0 }}>✓ All ingredient stock levels nominal.</p>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Ingredient</th>
-                  <th>Stock</th>
-                  <th>Unit</th>
-                  <th>Reorder At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lowStock.map((item) => (
-                  <tr key={item.inventory_id}>
-                    <td style={{ fontWeight: 500 }}>{item.ingredients_name}</td>
-                    <td style={{ color: "#c0392b", fontWeight: 600 }}>{item.current_stock}</td>
-                    <td>{item.unit_of_measure}</td>
-                    <td style={{ color: "#6b6f8a" }}>{item.recorder_trigger}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div style={metricLabel}>Weekly Revenue</div>
+            <Link href="/reports">
+              <button className="btn btn-secondary" style={{ marginTop: 12, fontSize: 12, padding: "4px 8px" }}>View</button>
+            </Link>
           </div>
-        )}
-      </div>
 
+          <div style={metricCard}>
+            <div style={{ ...metricVal, color: lowStock && lowStock.length > 0 ? "#c0392b" : "var(--navy, #0f172a)" }}>
+              {lowStock?.length ?? 0}
+            </div>
+            <div style={metricLabel}>Low Stock Items</div>
+            <Link href="/inventory">
+              <button className="btn btn-secondary" style={{ marginTop: 12, fontSize: 12, padding: "4px 8px" }}>View</button>
+            </Link>
+          </div>
+        </div>
+
+        {/* ─── USER'S DETAILED ORDER TABLE ─── */}
+        <div style={{ background: "rgba(255,255,255,0.95)", padding: 24, borderRadius: 16, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <h3 style={{ margin: 0 }}>Order Management</h3>
+            <Link href="/orders/new" className="btn btn-primary">+ New Order</Link>
+          </div>
+
+          {/* Status filters */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+            <button
+              className={`btn ${statusFilter === "" ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => { setStatusFilter(""); setPage(1); }}
+            >
+              All Managed
+            </button>
+            {STATUSES.map((s) => (
+              <button
+                key={s}
+                className={`btn ${statusFilter === s ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => { setStatusFilter(s); setPage(1); }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+
+          {ordersLoading && <div className="spinner" />}
+          {error && <p style={{ color: "red" }}>Error Loading Data: {error}</p>}
+          
+          {!ordersLoading && (
+            <>
+              <div className="table-wrap" style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", textAlign: "left", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "2px solid #e2e8f0" }}>
+                      <th style={{ padding: 12 }}>Order ID</th>
+                      <th>Customer</th>
+                      <th>Date & Time</th>
+                      <th>Fulfillment</th>
+                      <th>Payment</th>
+                      <th>Total</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} style={{ padding: 24, textAlign: "center", color: "#64748b" }}>
+                          No orders matched your current tracking parameters.
+                        </td>
+                      </tr>
+                    ) : (
+                      orders.map((order) => {
+                        const badge = statusBadge[order.order_status] ?? { bg: "#f3f4f6", color: "#374151" };
+                        return (
+                          <tr key={order.order_id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                            <td style={{ padding: 12, fontWeight: 600 }}>#{order.order_id}</td>
+                            <td>
+                              {order.customer
+                                ? `${order.customer.cust_firstname} ${order.customer.cust_lastname}`
+                                : `Customer #${String(order.customer_id).slice(0, 8)}`}
+                            </td>
+                            <td style={{ fontSize: 13, color: "#6b6f8a" }}>
+                              {new Date(order.order_time).toLocaleString("en-PH", {
+                                month: "short", day: "numeric",
+                                hour: "2-digit", minute: "2-digit",
+                              })}
+                            </td>
+                            <td>{order.fulfillment?.fulfillment_type ?? order.ord_f_type ?? "—"}</td>
+                            <td>{order.payment_method ?? "Cash"}</td>
+                            <td style={{ fontWeight: 600 }}>
+                              ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td>
+                              <span style={{
+                                fontSize: 11, padding: "3px 10px", background: badge.bg,
+                                color: badge.color, fontWeight: 600, borderRadius: "4px"
+                              }}>
+                                {order.order_status}
+                              </span>
+                            </td>
+                            <td>
+                              <Link href={`/orders/${order.order_id}`} style={{ color: "#c8883a", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                                View →
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {total > 5 && (
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+                  <button className="btn btn-secondary" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+                    ← Prev
+                  </button>
+                  <span style={{ lineHeight: "36px", fontSize: 13, color: "#6b6f8a" }}>
+                    Page {page} of {Math.ceil(total / 5)}
+                  </span>
+                  <button className="btn btn-secondary" disabled={page * 5 >= total} onClick={() => setPage((p) => p + 1)}>
+                    Next →
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
+
+// Group mate's styles moved to bottom
+const metricCard: React.CSSProperties = {
+  background: "rgba(255,255,255,0.93)",
+  backdropFilter: "blur(8px)",
+  borderRadius: 16,
+  padding: "16px 18px",
+  boxShadow: "0 3px 12px rgba(0,0,0,0.12)",
+};
+const metricVal: React.CSSProperties = {
+  fontSize: 24,
+  fontWeight: 700,
+  color: "var(--navy, #0f172a)",
+};
+const metricLabel: React.CSSProperties = {
+  fontSize: 11,
+  color: "var(--text-muted, #64748b)",
+  fontWeight: 600,
+  marginTop: 2,
+};
