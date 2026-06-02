@@ -1,173 +1,243 @@
 "use client";
 
-import { useState } from "react";
 import { useFetch } from "@/hooks/useFetch";
-import { ordersApi } from "@/lib/api";
+import { ordersApi, reportsApi, inventoryApi } from "@/lib/api";
 import Link from "next/link";
-import type { OrderStatus, Order } from "@/types";
+// Notice we are assuming your clean frontend interface file handles types cleanly now
+import type { WeeklySummary, PaginatedResponse, Order, InventoryItem } from "./index"; 
 
-// Backend statuses only — matches app/model/order.py
-const STATUSES: OrderStatus[] = [
-  "Pending",
-  "Preparing",
-  "Out for Delivery",
-  "Completed",
-  "Cancelled",
-];
-
-const statusBadge: Record<OrderStatus, { bg: string; color: string }> = {
-  Pending:            { bg: "#fef9c3", color: "#854d0e" },
-  Preparing:          { bg: "#dbeafe", color: "#1e3a8a" },
-  "Out for Delivery": { bg: "#e0f2fe", color: "#0c4a6e" },
-  Completed:          { bg: "#dcfce7", color: "#14532d" },
-  Cancelled:          { bg: "#fee2e2", color: "#7f1d1d" },
-};
-
-export default function OrdersPage() {
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [page, setPage] = useState(1);
-
-  // Backend GET /orders returns List[Order] (not paginated), but api.ts wraps with
-  // PaginatedResponse shape. Accept both to be safe.
-  const { data: raw, loading, error, refetch } = useFetch<Order[] | { data: Order[]; total: number }>(
-    () => ordersApi.list(page, 20, statusFilter || undefined) as unknown as Promise<Order[] | { data: Order[]; total: number }>,
-    [page, statusFilter]
+export default function DashboardPage() {
+  // 1. Fetching clean schemas delivered directly from the backend's new controller
+  const { data: summary, loading: sumLoading } = useFetch<WeeklySummary>(reportsApi.weeklySummary);
+  const { data: orders, loading: ordersLoading } = useFetch<PaginatedResponse<Order>>(() =>
+    ordersApi.list(1, 5, "Pending")
   );
-
-  const orders: Order[] = Array.isArray(raw) ? raw : (raw as { data: Order[] } | null)?.data ?? [];
-  const total: number = Array.isArray(raw) ? raw.length : (raw as { total: number } | null)?.total ?? 0;
+  const { data: lowStock } = useFetch<InventoryItem[]>(inventoryApi.lowStock);
 
   return (
-    <div className="page-body">
-      <div className="page-header">
-        <h1 className="page-title">Orders</h1>
-        <Link href="/orders/new" className="btn btn-primary">+ New Order</Link>
+    <div style={{
+      position: "relative",
+      minHeight: "calc(100vh - var(--navbar-h))",
+      overflow: "hidden",
+    }}>
+      {/* ─── BACKGROUND IMAGE RE-SIZED TO FILL THE WHOLE PAGE WITH NO SPACES ─── */}
+      <div style={{
+        position: "fixed", // Changed to fixed to ensure it locks to viewport boundaries
+        top: "var(--navbar-h)", // Aligns exactly where your navbar finishes
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundImage: "url('/dashboard-bg.png')",
+        backgroundSize: "100% 100%", // Forces the raw canvas to stretch over 100% width and height completely
+        backgroundPosition: "center center",
+        backgroundRepeat: "no-repeat",
+        backgroundColor: "#c8a882",
+        imageRendering: "auto",
+        zIndex: 0,
+      }} />
+
+      {/* Right half: logo */}
+      <div style={{
+        position: "absolute",
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: "50%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        pointerEvents: "none",
+        zIndex: 1,
+      }}>
+        <img
+          src="/CKWebLogo.png"
+          alt="CookieKrave"
+          style={{ width: "70%", maxWidth: 380, objectFit: "contain" }}
+        />
       </div>
 
-      {/* Status filter pills */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-        <button
-          className={`btn ${statusFilter === "" ? "btn-primary" : "btn-secondary"}`}
-          onClick={() => { setStatusFilter(""); setPage(1); }}
-        >
-          All
-        </button>
-        {STATUSES.map((s) => (
-          <button
-            key={s}
-            className={`btn ${statusFilter === s ? "btn-primary" : "btn-secondary"}`}
-            onClick={() => { setStatusFilter(s); setPage(1); }}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+      {/* ── Left content panel — full height, with left spacing ── */}
+      <div style={{
+        position: "relative",
+        zIndex: 2,
+        width: "52%",
+        padding: "0 24px 32px 28px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        minHeight: "calc(100vh - var(--navbar-h))",
+      }}>
 
-      <div className="card">
-        {loading && <div className="spinner" />}
-        {error && <p style={{ color: "red" }}>Error: {error}</p>}
-        {!loading && (
-          <>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Order ID</th>
-                    <th>Customer</th>
-                    <th>Date & Time</th>
-                    <th>Fulfillment</th>
-                    <th>Payment</th>
-                    <th>Total</th>
-                    <th>Status</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.length === 0 ? (
-                    <tr>
-                      <td colSpan={8}>
-                        <div className="empty-state">
-                          <p>No orders found</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    orders.map((order) => {
-                      const badge = statusBadge[order.order_status] ?? { bg: "#f3f4f6", color: "#374151" };
-                      return (
-                        <tr key={order.ord_id}>
-                          <td style={{ fontWeight: 600 }}>#{order.ord_id}</td>
-                          <td>
-                            {order.customer
-                              ? `${order.customer.cust_firstname} ${order.customer.cust_lastname}`
-                              : `Customer #${String(order.cust_id).slice(0, 8)}`}
-                          </td>
-                          <td style={{ fontSize: 13, color: "#6b6f8a" }}>
-                            {new Date(order.ord_time).toLocaleString("en-PH", {
-                              month: "short", day: "numeric",
-                              hour: "2-digit", minute: "2-digit",
-                            })}
-                          </td>
-                          <td>{order.fulfillment?.fulfillment_type ?? order.ord_f_type ?? "—"}</td>
-                          <td>{order.ord_pay_meth}</td>
-                          <td style={{ fontWeight: 600 }}>
-                            ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                          </td>
-                          <td>
-                            <span
-                              className="badge"
-                              style={{
-                                fontSize: 11,
-                                padding: "3px 10px",
-                                background: badge.bg,
-                                color: badge.color,
-                                fontWeight: 600,
-                              }}
-                            >
-                              {order.order_status}
-                            </span>
-                          </td>
-                          <td>
-                            <Link
-                              href={`/orders/${order.ord_id}`}
-                              style={{ color: "#c8883a", fontSize: 13, fontWeight: 600 }}
-                            >
-                              View →
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+        {/* Row 1: Dashboard pill + Total Orders pill */}
+        <div style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: 12,
+          marginTop: 0,
+        }}>
+          <div style={{
+            background: "var(--navy)",
+            borderRadius: "0 0 14px 14px",
+            padding: "20px 28px 14px 28px",
+            color: "#fff",
+            fontWeight: 800,
+            fontSize: 26,
+            letterSpacing: "-0.3px",
+            boxShadow: "0 6px 20px rgba(13,18,64,0.22)",
+            lineHeight: 1,
+            flexShrink: 0,
+          }}>
+            Dashboard
+          </div>
+
+          {/* Total Orders pill */}
+          <div style={{
+            background: "rgba(255,255,255,0.93)",
+            backdropFilter: "blur(8px)",
+            borderRadius: 999,
+            padding: "11px 28px",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            boxShadow: "0 3px 10px rgba(13,18,64,0.13)",
+            marginBottom: 0,
+            alignSelf: "center",
+            whiteSpace: "nowrap",
+          }}>
+            <span style={{ fontSize: 18, fontWeight: 700, color: "var(--navy)" }}>
+              {sumLoading ? "—" : summary?.totalOrders ?? 0}
+            </span>
+            <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>
+              Total Orders this week
+            </span>
+          </div>
+        </div>
+
+        {/* Row 2: Three metric cards */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 12,
+          marginLeft: 20,
+          marginRight: 0,
+        }}>
+          <div style={metricCard}>
+            <div style={metricVal}>{sumLoading ? "—" : summary?.completedOrders ?? 0}</div>
+            <div style={metricLabel}>Fulfilled Orders</div>
+            <Link href="/orders?status=Completed">
+              <button className="view-btn" style={{ marginTop: 12 }}>View</button>
+            </Link>
+          </div>
+
+          <div style={metricCard}>
+            <div style={{ ...metricVal, fontSize: 16 }}>
+              {sumLoading ? "—" : `₱${Number(summary?.totalRevenue ?? 0).toLocaleString("en-PH")}`}
             </div>
+            <div style={metricLabel}>Weekly Revenue</div>
+            <Link href="/reports">
+              <button className="view-btn" style={{ marginTop: 12, background: "transparent", color: "var(--navy)", border: "1.5px solid var(--border)" }}>View</button>
+            </Link>
+          </div>
 
-            {/* Pagination */}
-            {total > 20 && (
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-                <button
-                  className="btn btn-secondary"
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  ← Prev
-                </button>
-                <span style={{ lineHeight: "36px", fontSize: 13, color: "#6b6f8a" }}>
-                  Page {page} of {Math.ceil(total / 20)}
-                </span>
-                <button
-                  className="btn btn-secondary"
-                  disabled={page * 20 >= total}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next →
-                </button>
-              </div>
-            )}
-          </>
-        )}
+          <div style={metricCard}>
+            <div style={{ ...metricVal, color: lowStock && lowStock.length > 0 ? "#c0392b" : "var(--navy)" }}>
+              {lowStock?.length ?? 0}
+            </div>
+            <div style={metricLabel}>Low Stock Items</div>
+            <Link href="/inventory">
+              <button className="view-btn" style={{ marginTop: 12 }}>View</button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Row 3: Pending Orders card */}
+        <div style={{
+          background: "rgba(255,255,255,0.93)",
+          backdropFilter: "blur(8px)",
+          borderRadius: 16,
+          padding: "18px 20px",
+          boxShadow: "0 3px 12px rgba(0,0,0,0.12)",
+          marginLeft: 20,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700 }}>Pending Orders</h3>
+            <Link href="/orders?status=Pending" style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>
+              View all →
+            </Link>
+          </div>
+
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1.2fr 1fr 1fr",
+            padding: "4px 0 8px",
+            borderBottom: "1px solid var(--border)",
+            fontSize: 12,
+            color: "var(--text-muted)",
+            fontWeight: 600,
+          }}>
+            <span>Order ID</span>
+            <span>Customer</span>
+            <span>Amount</span>
+            <span>Time</span>
+          </div>
+
+          {ordersLoading ? (
+            <div className="spinner" />
+          // ─── FIXED LINE 186 CRASH HERE BY ADDING EXTRA DEFENSIVE PROPERTY RUNTIME GUARDS ───
+          ) : !orders || !orders.data || !orders.data.length ? (
+            <p style={{ color: "var(--text-muted)", fontSize: 13, padding: "10px 0" }}>No pending orders</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+              {orders.data.slice(0, 3).map((order) => (
+                <Link key={order.id} href={`/orders/${order.id}`}>
+                  <div style={{
+                    background: "var(--navy)",
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1.2fr 1fr 1fr",
+                    color: "#fff",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}>
+                    <span>#{order.id}</span>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {order.customerName}
+                    </span>
+                    <span>₱{Number(order.totalAmount).toFixed(2)}</span>
+                    <span style={{ fontSize: 11, opacity: 0.8 }}>
+                      {isNaN(Date.parse(order.createdAt)) 
+                        ? "—" 
+                        : new Date(order.createdAt).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })
+                      }
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+
+const metricCard: React.CSSProperties = {
+  background: "rgba(255,255,255,0.93)",
+  backdropFilter: "blur(8px)",
+  borderRadius: 16,
+  padding: "16px 18px",
+  boxShadow: "0 3px 12px rgba(0,0,0,0.12)",
+};
+const metricVal: React.CSSProperties = {
+  fontSize: 24,
+  fontWeight: 700,
+  color: "var(--navy)",
+};
+const metricLabel: React.CSSProperties = {
+  fontSize: 11,
+  color: "var(--text-muted)",
+  fontWeight: 600,
+  marginTop: 2,
+};

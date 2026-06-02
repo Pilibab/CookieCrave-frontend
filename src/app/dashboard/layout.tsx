@@ -1,16 +1,10 @@
-import Sidebar from "@/components/layout/Sidebar";
+import AdminNavbar from "@/components/layout/AdminNavbar";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="layout">
-      <Sidebar />
-      <div className="main-content">
-        {children}
-      </div>
+      <AdminNavbar />
+      <div className="main-content">{children}</div>
     </div>
   );
 }
