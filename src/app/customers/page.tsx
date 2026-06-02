@@ -5,24 +5,18 @@ import { useFetch } from "@/hooks/useFetch";
 import { customersApi } from "@/lib/api";
 import type { Customer } from "@/types";
 
-export default function CustomersPage() {
-  const [page, setPage] = useState(1);
 
-  const { data: raw, loading, refetch } = useFetch<Customer[] | { data: Customer[]; total: number }>(
-    () => customersApi.list(page, 20) as unknown as Promise<Customer[] | { data: Customer[]; total: number }>,
-    [page]
-  );
+export default function CustomersPage() {
+  // 1. Simplified Fetch: Directly expects an array from the API
+  const { data: customers = [], loading, refetch } = useFetch<Customer[]>(customersApi.list);
+  
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
 
-  const customers: Customer[] = Array.isArray(raw)
-    ? raw
-    : (raw as { data: Customer[] } | null)?.data ?? [];
-  const total: number = Array.isArray(raw)
-    ? raw.length
-    : (raw as { total: number } | null)?.total ?? 0;
+  // 2. Simplified Counts & Filters
+  const total = customers?.length;
 
-  const filtered = customers.filter((c) =>
+  const filtered = customers?.filter((c) =>
     !search ||
     `${c.cust_firstname} ${c.cust_lastname}`.toLowerCase().includes(search.toLowerCase()) ||
     c.cust_email.toLowerCase().includes(search.toLowerCase()) ||
@@ -31,12 +25,10 @@ export default function CustomersPage() {
 
   return (
     <div style={containerStyle}>
-      {/* Immersive high-visibility background image layer matching workspace theme */}
       <div style={backgroundWrapperStyle} />
       <div style={luxuryScrimOverlayStyle} />
 
       <div style={contentWrapperStyle}>
-        
         {/* Sleek Low-Profile Header */}
         <div style={headerContainerStyle}>
           <div>
@@ -72,75 +64,58 @@ export default function CustomersPage() {
           {loading && <div style={statusMessageStyle}>Retrieving customer catalog records...</div>}
           
           {!loading && (
-            <>
-              <div style={{ overflowX: "auto" }}>
-                <table style={tableStyle}>
-                  <thead>
-                    <tr style={tableHeaderRowStyle}>
-                      <th style={thStyle}>ID</th>
-                      <th style={thStyle}>Full Name</th>
-                      <th style={thStyle}>Email Address</th>
-                      <th style={thStyle}>Contact No.</th>
-                      <th style={thStyle}>Provider</th>
-                      <th style={{ ...thStyle, textAlign: "right" }}>Created Date</th>
+            <div style={{ overflowX: "auto" }}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr style={tableHeaderRowStyle}>
+                    <th style={thStyle}>ID</th>
+                    <th style={thStyle}>Full Name</th>
+                    <th style={thStyle}>Email Address</th>
+                    <th style={thStyle}>Contact No.</th>
+                    <th style={thStyle}>Provider</th>
+                    <th style={{ ...thStyle, textAlign: "right" }}>Created Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered?.map((c) => (
+                    <tr key={c.cust_id} style={tableRowStyle}>
+                      <td style={{ ...tdStyle, color: "#C8883A", fontSize: "11px", fontFamily: "monospace" }}>
+                        {String(c.cust_id).slice(0, 8).toUpperCase()}
+                      </td>
+                      <td style={{ ...tdStyle, fontWeight: 600, color: "#FFFFFF" }}>
+                        {c.cust_lastname}, {c.cust_firstname}
+                        {c.cust_middlename ? ` ${c.cust_middlename[0]}.` : ""}
+                      </td>
+                      <td style={tdStyle}>{c.cust_email}</td>
+                      <td style={tdStyle}>{c.cust_cont_no || "—"}</td>
+                      <td style={{ ...tdStyle, fontSize: "13px", color: "#94a3b8", textTransform: "capitalize" }}>
+                        {c.cust_social_provider ?? "Standard"}
+                      </td>
+                      <td style={{ ...tdStyle, fontSize: "13px", color: "#94a3b8", textAlign: "right" }}>
+                        {c.cust_cd && !isNaN(Date.parse(c.cust_cd))
+                          ? new Date(c.cust_cd).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })
+                          : "—"}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((c) => (
-                      <tr key={c.cust_id} style={tableRowStyle}>
-                        <td style={{ ...tdStyle, color: "#C8883A", fontSize: "11px", fontFamily: "monospace" }}>
-                          {String(c.cust_id).slice(0, 8).toUpperCase()}
-                        </td>
-                        <td style={{ ...tdStyle, fontWeight: 600, color: "#FFFFFF" }}>
-                          {c.cust_lastname}, {c.cust_firstname}
-                          {c.cust_middlename ? ` ${c.cust_middlename[0]}.` : ""}
-                        </td>
-                        <td style={tdStyle}>{c.cust_email}</td>
-                        <td style={tdStyle}>{c.cust_cont_no || "—"}</td>
-                        <td style={{ ...tdStyle, fontSize: "13px", color: "#94a3b8", textTransform: "capitalize" }}>
-                          {c.cust_social_provider ?? "Standard"}
-                        </td>
-                        <td style={{ ...tdStyle, fontSize: "13px", color: "#94a3b8", textAlign: "right" }}>
-                          {c.cust_cd && !isNaN(Date.parse(c.cust_cd))
-                            ? new Date(c.cust_cd).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })
-                            : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                    {filtered.length === 0 && (
-                      <tr>
-                        <td colSpan={6} style={emptyTableStyle}>
-                          No custom client listings detected.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Minimal Pagination controls */}
-              {total > 20 && (
-                <div style={paginationRowStyle}>
-                  <span style={paginationInfoStyle}>
-                    Segment <strong>{page}</strong> of {Math.ceil(total / 20)}
-                  </span>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button style={page === 1 ? disablePagingBtnStyle : pagingBtnStyle} disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
-                      ←
-                    </button>
-                    <button style={page * 20 >= total ? disablePagingBtnStyle : pagingBtnStyle} disabled={page * 20 >= total} onClick={() => setPage((p) => p + 1)}>
-                      →
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
+                  ))}
+                  {filtered?.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={emptyTableStyle}>
+                        No custom client listings detected.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
         </main>
       </div>
     </div>
   );
 }
+
+// Ensure your CustomerForm component remains below this exactly as it was!
 
 function CustomerForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
