@@ -1,15 +1,13 @@
 "use client";
 
 import { useFetch } from "@/hooks/useFetch";
-import { ordersApi, reportsApi, inventoryApi } from "@/lib/api";
 import Link from "next/link";
+import { dashboardApi, inventoryDashboardApi } from "@/lib/adapters/dashboard.adapter";
 
 export default function DashboardPage() {
-  const { data: summary, loading: sumLoading } = useFetch(reportsApi.weeklySummary);
-  const { data: orders, loading: ordersLoading } = useFetch(() =>
-    ordersApi.list(1, 5, "Pending")
-  );
-  const { data: lowStock } = useFetch(inventoryApi.lowStock);
+  const { data: summary, loading: sumLoading } = useFetch(dashboardApi.weeklySummary);
+  const { data: orders, loading: ordersLoading } = useFetch(() => dashboardApi.pendingOrders(1, 5));
+  const { data: lowStock } = useFetch(inventoryDashboardApi.lowStock);
 
   // Check if ordering window is open (Mon–Fri before 10PM)
   const now = new Date();
@@ -116,7 +114,6 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
-
         {/* Low stock */}
         <div className="card">
           <div style={s.cardHeader}>

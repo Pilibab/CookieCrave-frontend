@@ -5,12 +5,29 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export const IS_MOCK = false;
 
 // ─── Real API ─────────────────────────────────────────────────────────────────
+// Real API inside api.ts
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  // 1. Manually extract the cookie value from the browser string
+  const getCookie = (name: string) => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift();
+    return null;
+  };
+
+  const token = getCookie("sb-access-token");
+
   const res = await fetch(`${BASE_URL}/api${path}`, {
-    headers: { "Content-Type": "application/json", ...options.headers },
+    headers: { 
+      "Content-Type": "application/json", 
+      // 2. Explicitly inject the Bearer header so the original backend HTTPBearer() works!
+      ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+      ...options.headers 
+    },
     credentials: "include",
     ...options,
   });
+
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: res.statusText }));
     throw new Error(error.message ?? "API Error");
@@ -70,7 +87,7 @@ export const customersApi = {
   list: (page = 1, limit = 20) => IS_MOCK
     ? getMock().mockCustomersApi.list(page, limit)
     : request<import("@/types/mytypes").PaginatedResponse<import("@/types/mytypes").Customer>>(`/api/customers?page=${page}&limit=${limit}`),
-  get: (id: number) => IS_MOCK
+  get: (id: string) => IS_MOCK
     ? getMock().mockCustomersApi.get(id)
     : request<import("@/types/mytypes").Customer>(`/customers/${id}`),
   create: (body: Partial<import("@/types/mytypes").Customer>) => IS_MOCK
@@ -247,66 +264,69 @@ export const pickupApi = {
 // PUT    /inventory/{inv_id}
 // DELETE /inventory/{inv_id}
 // PATCH  /inventory/{inv_id}/adjust-stock
+export type UnitType = "pcs" | "ml" | "g" | "kg";
+
 export const inventoryApi = {
-  list: () => IS_MOCK
-    ? getMock().mockInventoryApi.list()
-    : request<import("@/types/mytypes").InventoryItem[]>("/inventory"),
-  get: (id: number) => IS_MOCK
-    ? getMock().mockInventoryApi.get(id)
-    : request<import("@/types/mytypes").InventoryItem>(`/inventory/${id}`),
-  create: (body: Partial<import("@/types/mytypes").InventoryItem>) => IS_MOCK
-    ? getMock().mockInventoryApi.create(body)
-    : request<import("@/types/mytypes").InventoryItem>("/inventory", { method: "POST", body: JSON.stringify(body) }),
-  update: (id: number, body: Partial<import("@/types/mytypes").InventoryItem>) => IS_MOCK
-    ? getMock().mockInventoryApi.update(id, body)
-    : request<import("@/types/mytypes").InventoryItem>(`/inventory/${id}`, { method: "PUT", body: JSON.stringify(body) }),
-  delete: (id: number) => IS_MOCK
-    ? Promise.resolve()
-    : request(`/inventory/${id}`, { method: "DELETE" }),
-  adjustStock: (id: number, adjustment: number) => IS_MOCK
-    ? getMock().mockInventoryApi.adjustStock(id, adjustment)
-    : request<import("@/types/mytypes").InventoryItem>(`/inventory/${id}/adjust-stock`, { method: "PATCH", body: JSON.stringify({ adjustment }) }),
-  // Derived client-side from list(); no dedicated /low-stock endpoint in the API
-  lowStock: () => IS_MOCK
-    ? getMock().mockInventoryApi.lowStock()
-    : request<import("@/types/mytypes").InventoryItem[]>("/inventory").then((items) =>
-        items
-          .filter((i) => i.inv_stock <= i.inv_rt)
-          .map((i) => ({ ...i, is_low: true })) as import("@/types/mytypes").LowStockItem[]
-      ),
+  // GET /inventory
+  list: () : Promise<import("@/types/mytypes").InventoryItem[]> =>
+      request<import("@/types/mytypes").InventoryItem[]>("/inventory"),
+
+  // GET /inventory/{inv_id}
+  get: (id: number) =>
+    IS_MOCK
+      ? getMock().mockInventoryApi.get(id)
+      : request<import("@/types/mytypes").InventoryItem>(`/inventory/${id}`),
+
+  // POST /inventory — body fields: inv_ing_name, inv_stock, inv_uom, inv_rt
+  create: (body: {
+    inv_ing_name: string;
+    inv_stock?: number;
+    inv_uom: UnitType;
+    inv_rt?: number;
+  }) =>
+    IS_MOCK
+      ? getMock().mockInventoryApi.create(body)
+      : request<import("@/types/mytypes").InventoryItem>("/inventory", {
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
+
+  // DELETE /inventory/{inv_id}
+  delete: (id: number) =>
+    IS_MOCK
+      ? Promise.resolve()
+      : request(`/inventory/${id}`, { method: "DELETE" }),
+
+  // PATCH /inventory/{inv_id}/adjust-stock?amount={amount}
+  // amount > 0 to restock, amount < 0 to deduct
+  // No request body — backend reads `amount` as a query parameter
+  adjustStock: (id: number, amount: number) =>
+    IS_MOCK
+      ? getMock().mockInventoryApi.adjustStock(id, amount)
+      : request<import("@/types/mytypes").InventoryItem>(
+          `/inventory/${id}/adjust-stock?amount=${amount}`,
+          { method: "PATCH" }
+        ),
+
+  // POST /inventory/deduct-by-order/{order_id}
+  deductByOrder: (orderId: number) =>
+    IS_MOCK
+      ? Promise.resolve()
+      : request(`/inventory/deduct-by-order/${orderId}`, { method: "POST" }),
+
+  // Derived client-side — no dedicated /low-stock backend endpoint
+  lowStock: () =>
+    IS_MOCK
+      ? getMock().mockInventoryApi.lowStock()
+      : request<import("@/types/mytypes").InventoryItem[]>("/inventory").then(
+          (items) =>
+            items
+              .filter((i) => i.inv_stock <= i.inv_rt)
+              .map((i) => ({ ...i, is_low: true })) as import("@/types/mytypes").LowStockItem[]
+        ),
 };
 
-// ─── Orders ───────────────────────────────────────────────────────────────────
-// GET    /orders
-// POST   /orders
-// GET    /orders/{order_id}
-// PUT    /orders/{order_id}
-// DELETE /orders/{order_id}
-// GET    /orders/customer/{customer_id}
-export const ordersApi = {
-  list: (page = 1, limit = 20, status?: string) => IS_MOCK
-    ? getMock().mockOrdersApi.list(page, limit, status)
-    : request<import("@/types/mytypes").PaginatedResponse<import("@/types/mytypes").Order>>(`/orders?page=${page}&limit=${limit}${status ? `&status=${status}` : ""}`),
-  get: (id: number) => IS_MOCK
-    ? getMock().mockOrdersApi.get(id)
-    : request<import("@/types/mytypes").Order>(`/orders/${id}`),
-  create: (body: { customer_id: number; fulfillment_id: number; payment_method: string; cart_items: { product_id: number; quantity: number }[] }) => IS_MOCK
-    ? getMock().mockOrdersApi.create(body)
-    : request<import("@/types/mytypes").Order>("/orders", { method: "POST", body: JSON.stringify(body) }),
-  update: (id: number, body: Partial<import("@/types/mytypes").Order>) => IS_MOCK
-    ? getMock().mockOrdersApi.update(id, body)
-    : request<import("@/types/mytypes").Order>(`/orders/${id}`, { method: "PUT", body: JSON.stringify(body) }),
-  // Status is updated via PUT /orders/{order_id} — no dedicated PATCH status endpoint
-  updateStatus: (id: number, status: import("@/types/mytypes").OrderStatus) => IS_MOCK
-    ? getMock().mockOrdersApi.updateStatus(id, status)
-    : request<import("@/types/mytypes").Order>(`/orders/${id}`, { method: "PUT", body: JSON.stringify({ order_status: status }) }),
-  delete: (id: number) => IS_MOCK
-    ? Promise.resolve()
-    : request(`/orders/${id}`, { method: "DELETE" }),
-  getByCustomer: (customerId: number) => IS_MOCK
-    ? getMock().mockOrdersApi.getByCustomer(customerId)
-    : request<import("@/types/mytypes").Order[]>(`/orders/customer/${customerId}`),
-};
+
 
 // ─── Riders ───────────────────────────────────────────────────────────────────
 // GET    /riders
@@ -346,12 +366,97 @@ export const adminApi = {
 
 // ─── Reports ──────────────────────────────────────────────────────────────────
 // GET /reports/weekly?week_start=YYYY-MM-DD  — weekly summary
-// GET /reports/orders-by-status              — order counts grouped by status
 export const reportsApi = {
-  weeklySummary: (weekStart?: string) => IS_MOCK
-    ? getMock().mockReportsApi.weeklySummary(weekStart)
-    : request<import("@/types/mytypes").WeeklySummary>(`/reports/weekly${weekStart ? `?week_start=${weekStart}` : ""}`),
-  ordersByStatus: () => IS_MOCK
-    ? getMock().mockReportsApi.ordersByStatus()
-    : request<Record<import("@/types/mytypes").OrderStatus, number>>("/reports/orders-by-status"),
+  weeklySummary: (weekStart?: string) =>
+    IS_MOCK
+      ? getMock().mockReportsApi.weeklySummary(weekStart)
+      : request<import("@/types/mytypes").WeeklySummary>(
+          `/reports/weekly${weekStart ? `?week_start=${weekStart}` : ""}`
+        ),
+
+  // No backend endpoint yet — mock only until /reports/orders-by-status is implemented
+  ordersByStatus: () =>
+    getMock().mockReportsApi.ordersByStatus() as Promise <
+      Record<import("@/types/mytypes").OrderStatus, number>
+    >,
+};
+// ─── Orders ───────────────────────────────────────────────────────────────────
+// GET    /orders
+// POST   /orders
+// GET    /orders/{order_id}
+// PUT    /orders/{order_id}
+// DELETE /orders/{order_id}
+// GET    /orders/customer/{customer_id}
+// ─── Order request types (matching backend's CreateOrderRequest) ──────────────
+export interface CreateOrderBody {
+  cust_id: string;           // UUID as string
+  total_amount: number;
+  ord_pay_meth: "Cash" | "GCash";
+  ord_f_type: "Delivery" | "Pick_Up";
+  prod_ids: number[];        // list of product IDs → backend populates cart
+  reference_no?: string;     // required only when ord_pay_meth === "GCash"
+}
+
+export const ordersApi = {
+  // GET /orders — backend returns Order[], no pagination wrapper
+  list: () =>
+    IS_MOCK
+      ? getMock().mockOrdersApi.list()
+      : request<import("@/types/mytypes").Order[]>("/orders"),
+
+  // GET /orders/{order_id}
+  get: (id: number) =>
+    IS_MOCK
+      ? getMock().mockOrdersApi.get(id)
+      : request<import("@/types/mytypes").Order>(`/orders/${id}`),
+
+  // POST /orders — 201 Created; body must match CreateOrderRequest
+  create: (body: CreateOrderBody) =>
+    IS_MOCK
+      ? getMock().mockOrdersApi.create(body)
+      : request<import("@/types/mytypes").Order>("/orders", {
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
+
+  // PUT /orders/{order_id} — full Order object required by backend
+  update: (id: number, body: Partial<import("@/types/mytypes").Order>) =>
+    IS_MOCK
+      ? getMock().mockOrdersApi.update(id, body)
+      : request<import("@/types/mytypes").Order>(`/orders/${id}`, {
+          method: "PUT",
+          body: JSON.stringify(body),
+        }),
+
+  // Status update — still PUT /orders/{order_id}, only order_status patched
+  updateStatus: (
+    id: number,
+    status: import("@/types/mytypes").OrderStatus
+  ) =>
+    IS_MOCK
+      ? "getMock().mockOrdersApi.updateStatus(id, status)"
+      : request<import("@/types/mytypes").Order>(`/orders/${id}`, {
+          method: "PUT",
+          body: JSON.stringify({ order_status: status }),
+        }),
+
+  // DELETE /orders/{order_id}
+  delete: (id: number) =>
+    IS_MOCK
+      ? Promise.resolve()
+      : request(`/orders/${id}`, { method: "DELETE" }),
+
+  // GET /orders/customer/{customer_id} — cust_id is a UUID string on the backend
+  getByCustomer: (customerId: string) =>
+    IS_MOCK
+      ? getMock().mockOrdersApi.getByCustomer(customerId)
+      : request<import("@/types/mytypes").Order[]>(
+          `/orders/customer/${customerId}`
+        ),
+
+  // GET /orders/{order_id}/bill?cust_id={cust_id}
+  getBill: (orderId: number, custId: string) =>
+    IS_MOCK
+      ? ""
+      : request(`/orders/${orderId}/bill?cust_id=${custId}`),
 };
