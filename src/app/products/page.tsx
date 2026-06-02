@@ -1,389 +1,209 @@
 "use client";
 
-import { useState } from "react";
 import { useFetch } from "@/hooks/useFetch";
-import { productsApi } from "@/lib/api";
-import type { Product } from "@/types";
+import { productsApi, bomApi, inventoryApi } from "@/lib/api";
+import type { Product, BOMEntry, InventoryItem } from "@/types/mytypes";
+
+// ─── Availability computation ─────────────────────────────────────────────────
+// A product is Available only when ALL of its BOM ingredients
+// have inv_stock > 0 (strictly above zero — no partial)
+function computeAvailability(
+  productId: number,
+  allBom: BOMEntry[],
+  inventoryMap: Map<number, InventoryItem>
+): { available: boolean; missingIngredients: string[] } {
+  // Filter BOM entries that belong to this product
+  const entries = allBom.filter((b) => b.prod_id === productId);
+
+  if (entries.length === 0) {
+    // No BOM defined — cannot determine availability; treat as unavailable
+    return { available: false, missingIngredients: ["No BOM configured"] };
+  }
+
+  const missingIngredients: string[] = [];
+
+  for (const entry of entries) {
+    const invItem = inventoryMap.get(entry.inv_id);
+    const required = entry.quantity ?? (entry as any).bom_quantity ?? 0;
+
+    if (!invItem) {
+      missingIngredients.push(`Ingredient #${entry.inv_id} (not found)`);
+      continue;
+    }
+
+    if ((invItem.inv_stock ?? 0) < required) {
+      missingIngredients.push(
+        `${invItem.inv_ing_name} (need ${required} ${invItem.inv_uom}, have ${invItem.inv_stock})`
+      );
+    }
+  }
+
+  return {
+    available: missingIngredients.length === 0,
+    missingIngredients,
+  };
+}
 
 export default function ProductsPage() {
-  const { data: products, loading, error, refetch } =
-    useFetch<Product[]>(productsApi.list);
+  const { data: products, loading: loadingProducts } = useFetch<Product[]>(productsApi.list);
+  const { data: allBom, loading: loadingBom } = useFetch<BOMEntry[]>(bomApi.list);
+  const { data: inventory, loading: loadingInv } = useFetch<InventoryItem[]>(inventoryApi.list);
 
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Product | null>(null);
-  const [search, setSearch] = useState("");
+  const loading = loadingProducts || loadingBom || loadingInv;
 
-  const filtered =
-    products?.filter(
-      (p) =>
-        p.prod_name.toLowerCase().includes(search.toLowerCase()) ||
-        p.prod_desc?.toLowerCase().includes(search.toLowerCase())
-    ) ?? [];
-
-  const handleDelete = async (id: number) => {
-    if (!confirm("Delete this product?")) return;
-
-    try {
-      await productsApi.delete(id);
-      refetch();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to delete product");
-    }
-  };
-
-  return (
-    <div>
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Products</h1>
-          <p
-            style={{
-              fontSize: 12,
-              color: "var(--text-muted)",
-              marginTop: 4,
-            }}
-          >
-            {products?.length ?? 0} products
-          </p>
-        </div>
-
-        <div style={{ display: "flex", gap: 10 }}>
-          <div className="search-bar">
-            <input
-              placeholder="Search products..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setEditing(null);
-              setShowForm(true);
-            }}
-          >
-            + New Product
-          </button>
-        </div>
-      </div>
-
-      {showForm && (
-        <ProductForm
-          initial={editing}
-          onClose={() => setShowForm(false)}
-          onSaved={refetch}
-        />
-      )}
-
-      {loading && <div className="spinner" />}
-
-      {error && (
-        <div style={{ color: "red", marginTop: 20 }}>
-          Error: {error}
-        </div>
-      )}
-
-      {!loading && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-          }}
-        >
-          {filtered.map((p) => (
-            <div
-              key={p.prod_id}
-              style={{
-                background: "var(--warm-white)",
-                border: "1px solid var(--border)",
-                borderRadius: 14,
-                padding: 18,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <strong>{p.prod_name}</strong>
-
-                  <span
-                    className="badge"
-                    style={{
-                      background: p.prod_available
-                        ? "#dcfce7"
-                        : "#fee2e2",
-                      color: p.prod_available
-                        ? "green"
-                        : "red",
-                    }}
-                  >
-                    {p.prod_available
-                      ? "Available"
-                      : "Unavailable"}
-                  </span>
-                </div>
-
-                <p
-                  style={{
-                    marginTop: 4,
-                    fontSize: 13,
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  {p.prod_desc}
-                </p>
-              </div>
-
-              <div
-                style={{
-                  textAlign: "right",
-                  marginRight: 16,
-                  minWidth: 90,
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 18,
-                  }}
-                >
-                  ₱{Number(p.prod_price).toFixed(2)}
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setEditing(p);
-                    setShowForm(true);
-                  }}
-                >
-                  Edit
-                </button>
-
-                <button
-                  className="btn btn-danger"
-                  onClick={() =>
-                    handleDelete(p.prod_id)
-                  }
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {filtered.length === 0 && (
-            <div className="empty-state">
-              No products found
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+  // Build a fast lookup map: inv_id → InventoryItem
+  const inventoryMap = new Map<number, InventoryItem>(
+    (inventory ?? []).map((i) => [i.inv_id, i])
   );
-}
-
-function ProductForm({
-  initial,
-  onClose,
-  onSaved,
-}: {
-  initial: Product | null;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [form, setForm] = useState({
-    prod_name: initial?.prod_name ?? "",
-    prod_desc: initial?.prod_desc ?? "",
-    prod_price: initial?.prod_price ?? 0,
-    prod_available: initial?.prod_available ?? true,
-  });
-
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState("");
-
-  const handleSave = async () => {
-    if (!form.prod_name.trim()) {
-      setErr("Product name is required.");
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      if (initial) {
-        await productsApi.update(initial.prod_id, form);
-      } else {
-        await productsApi.create(form);
-      }
-
-      onSaved();
-      onClose();
-    } catch (e) {
-      setErr(
-        e instanceof Error
-          ? e.message
-          : "Failed to save"
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
-    <div style={overlay}>
-      <div style={modal}>
-        <h2>
-          {initial
-            ? "Edit Product"
-            : "New Product"}
-        </h2>
+    <div style={containerStyle}>
+      <div style={backgroundWrapperStyle} />
+      <div style={luxuryScrimOverlayStyle} />
 
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 14,
-          }}
-        >
-          <div className="form-group">
-            <label className="form-label">
-              Product Name
-            </label>
-
-            <input
-              className="form-input"
-              value={form.prod_name}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  prod_name: e.target.value,
-                })
-              }
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">
-              Description
-            </label>
-
-            <textarea
-              className="form-textarea"
-              rows={3}
-              value={form.prod_desc}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  prod_desc: e.target.value,
-                })
-              }
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">
-              Price
-            </label>
-
-            <input
-              className="form-input"
-              type="number"
-              min={0}
-              step={0.01}
-              value={form.prod_price}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  prod_price: Number(
-                    e.target.value
-                  ),
-                })
-              }
-            />
-          </div>
-
-          <label
-            style={{
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={form.prod_available}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  prod_available:
-                    e.target.checked,
-                })
-              }
-            />
-            Available
-          </label>
-
-          {err && (
-            <p style={{ color: "red" }}>
-              {err}
+      <div style={contentWrapperStyle}>
+        {/* Header */}
+        <div style={headerContainerStyle}>
+          <div>
+            <h1 style={titleStyle}>Cookie Catalog</h1>
+            <p style={subtitleStyle}>
+              {products?.length ?? 0} products · availability based on live inventory
             </p>
-          )}
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 8,
-            }}
-          >
-            <button
-              className="btn btn-secondary"
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-
-            <button
-              className="btn btn-primary"
-              onClick={handleSave}
-              disabled={saving}
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
           </div>
         </div>
+
+        {loading && <div style={statusMessageStyle}>Loading product availability...</div>}
+
+        {!loading && (
+          <div style={gridStyle}>
+            {(products ?? []).map((product) => {
+              const productId = product.prod_id ?? (product as any).id;
+              const { available, missingIngredients } = computeAvailability(
+                productId,
+                allBom ?? [],
+                inventoryMap
+              );
+
+              // Get BOM entries for display
+              const bomEntries = (allBom ?? []).filter((b) => b.prod_id === productId);
+
+              return (
+                <div key={productId} style={cardStyle}>
+                  {/* Availability badge — top right */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+                    <span style={productIdStyle}>ID: {productId}</span>
+                    <span style={available ? availableBadgeStyle : unavailableBadgeStyle}>
+                      {available ? "✓ Available" : "✗ Unavailable"}
+                    </span>
+                  </div>
+
+                  {/* Product name */}
+                  <h3 style={productNameStyle}>
+                    {(product as any).prod_name ?? (product as any).name ?? `Product #${productId}`}
+                  </h3>
+
+                  {/* Price if exists */}
+                  {(product as any).prod_price != null && (
+                    <p style={priceStyle}>₱{Number((product as any).prod_price).toLocaleString()}</p>
+                  )}
+
+                  {/* Description if exists */}
+                  {(product as any).prod_description && (
+                    <p style={descStyle}>{(product as any).prod_description}</p>
+                  )}
+
+                  {/* Ingredient requirements from BOM */}
+                  {bomEntries.length > 0 && (
+                    <div style={ingredientsSection}>
+                      <p style={ingredientsTitleStyle}>Ingredients required:</p>
+                      <ul style={ingredientsListStyle}>
+                        {bomEntries.map((entry) => {
+                          const invItem = inventoryMap.get(entry.inv_id);
+                          const required = entry.quantity ?? (entry as any).bom_quantity ?? 0;
+                          const hasStock = invItem && (invItem.inv_stock ?? 0) >= required;
+                          return (
+                            <li key={entry.inv_id} style={{ ...ingredientItemStyle, color: hasStock ? "#bbf7d0" : "#fca5a5" }}>
+                              <span style={{ color: hasStock ? "#bbf7d0" : "#fca5a5", marginRight: "4px" }}>
+                                {hasStock ? "●" : "○"}
+                              </span>
+                              {invItem?.inv_ing_name ?? `Ingredient #${entry.inv_id}`}
+                              {" — "}
+                              <span style={{ color: "#94a3b8" }}>
+                                need {required} {invItem?.inv_uom ?? ""}
+                                {invItem && (
+                                  <>, have{" "}
+                                    <strong style={{ color: hasStock ? "#bbf7d0" : "#fca5a5" }}>
+                                      {invItem.inv_stock} {invItem.inv_uom}
+                                    </strong>
+                                  </>
+                                )}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* No BOM warning */}
+                  {bomEntries.length === 0 && (
+                    <div style={noBomStyle}>No BOM configured for this product.</div>
+                  )}
+
+                  {/* Bottom availability bar */}
+                  <div style={{
+                    ...availabilityBarStyle,
+                    backgroundColor: available
+                      ? "rgba(187,247,208,0.08)"
+                      : "rgba(252,165,165,0.08)",
+                    borderTop: `1px solid ${available ? "rgba(187,247,208,0.15)" : "rgba(252,165,165,0.15)"}`,
+                  }}>
+                    {available ? (
+                      <span style={{ color: "#bbf7d0", fontSize: "11px" }}>
+                        All ingredients in stock — ready to bake
+                      </span>
+                    ) : (
+                      <span style={{ color: "#fca5a5", fontSize: "11px" }}>
+                        Insufficient stock: {missingIngredients.slice(0, 2).join("; ")}
+                        {missingIngredients.length > 2 && ` +${missingIngredients.length - 2} more`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {(products ?? []).length === 0 && (
+              <div style={emptyStateStyle}>No products found.</div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-const overlay: React.CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,.4)",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  zIndex: 100,
-};
-
-const modal: React.CSSProperties = {
-  background: "#fff",
-  width: "100%",
-  maxWidth: 500,
-  borderRadius: 16,
-  padding: 24,
-};
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const containerStyle: React.CSSProperties = { position: "relative", minHeight: "calc(100vh - var(--navbar-h, 60px))", overflowY: "auto", padding: "24px 32px", backgroundColor: "#080605", fontFamily: "system-ui, -apple-system, sans-serif", color: "#FFFFFF" };
+const backgroundWrapperStyle: React.CSSProperties = { position: "fixed", top: "var(--navbar-h, 60px)", left: 0, right: 0, bottom: 0, backgroundImage: "url('/Products-bg.png')", backgroundSize: "cover", backgroundPosition: "center", opacity: 1, zIndex: 0, pointerEvents: "none" };
+const luxuryScrimOverlayStyle: React.CSSProperties = { position: "fixed", top: "var(--navbar-h, 60px)", left: 0, right: 0, bottom: 0, backgroundColor: "rgba(8,6,5,0.7)", zIndex: 1, pointerEvents: "none" };
+const contentWrapperStyle: React.CSSProperties = { position: "relative", zIndex: 2, maxWidth: "1340px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "20px" };
+const headerContainerStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" };
+const titleStyle: React.CSSProperties = { margin: 0, fontSize: "26px", fontWeight: "normal", fontFamily: "Georgia, serif", color: "#FFFFFF" };
+const subtitleStyle: React.CSSProperties = { margin: "2px 0 0 0", fontSize: "12px", color: "#64748b" };
+const gridStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "16px" };
+const cardStyle: React.CSSProperties = { backgroundColor: "rgba(20,18,16,0.82)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "6px", padding: "20px", display: "flex", flexDirection: "column", gap: "0", boxShadow: "0 15px 30px rgba(0,0,0,0.3)", overflow: "hidden" };
+const productIdStyle: React.CSSProperties = { fontSize: "10px", color: "#64748b", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase" };
+const availableBadgeStyle: React.CSSProperties = { backgroundColor: "rgba(220,252,231,0.12)", color: "#bbf7d0", border: "1px solid #bbf7d022", padding: "3px 8px", borderRadius: "3px", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" };
+const unavailableBadgeStyle: React.CSSProperties = { backgroundColor: "rgba(254,226,226,0.12)", color: "#fca5a5", border: "1px solid #fca5a522", padding: "3px 8px", borderRadius: "3px", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" };
+const productNameStyle: React.CSSProperties = { margin: "0 0 4px 0", fontSize: "17px", fontWeight: "normal", fontFamily: "Georgia, serif", color: "#FFFFFF" };
+const priceStyle: React.CSSProperties = { margin: "0 0 6px 0", fontSize: "14px", color: "#C8883A", fontWeight: 600 };
+const descStyle: React.CSSProperties = { margin: "0 0 12px 0", fontSize: "12px", color: "#64748b", lineHeight: "1.5" };
+const ingredientsSection: React.CSSProperties = { marginTop: "12px", marginBottom: "12px" };
+const ingredientsTitleStyle: React.CSSProperties = { margin: "0 0 6px 0", fontSize: "10px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" };
+const ingredientsListStyle: React.CSSProperties = { margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "4px" };
+const ingredientItemStyle: React.CSSProperties = { fontSize: "12px", display: "flex", alignItems: "center", flexWrap: "wrap", gap: "2px" };
+const noBomStyle: React.CSSProperties = { marginTop: "10px", fontSize: "11px", color: "#64748b", fontStyle: "italic" };
+const availabilityBarStyle: React.CSSProperties = { marginTop: "auto", paddingTop: "10px", marginTop: "14px", padding: "10px 12px", borderRadius: "4px" };
+const statusMessageStyle: React.CSSProperties = { textAlign: "center", padding: "32px 16px", fontSize: "13px", color: "#64748b" };
+const emptyStateStyle: React.CSSProperties = { padding: "40px", textAlign: "center", color: "#64748b", fontSize: "13px", fontStyle: "italic", gridColumn: "1 / -1" };
