@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useFetch, useMutation } from "@/hooks/useFetch";
-import { productsApi, customersApi, fulfillmentApi, ordersApi } from "@/lib/api";
+import { useFetch } from "@/hooks/useFetch";
+import { productsApi, customersApi, ordersApi } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import type { FulfillmentType, PaymentMethod } from "@/types/mytypes";
 
-interface CartItem { product_id: number; product_name: string; price: number; quantity: number; }
+interface CartItem { 
+  product_id: number; 
+  product_name: string; 
+  price: number; 
+  quantity: number; 
+}
 
 export default function NewOrderPage() {
   const router = useRouter();
@@ -14,9 +19,10 @@ export default function NewOrderPage() {
   const { data: products } = useFetch(productsApi.list);
   const { data: customers } = useFetch(() => customersApi.list(1, 100));
 
-  const [customerId, setCustomerId] = useState<number | "">("");
+  const [customerId, setCustomerId] = useState<string>(""); // Kept as string to safely handle DB UUIDs
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>("Pick_Up");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
+  const [referenceNo, setReferenceNo] = useState(""); // ADDED: State for GCash verification
   const [cart, setCart] = useState<CartItem[]>([]);
   const [address, setAddress] = useState("");
   const [preferredTime, setPreferredTime] = useState("");
@@ -24,15 +30,15 @@ export default function NewOrderPage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const available = products?.filter((p) => p.is_available) ?? [];
+  const available = products?.filter((p) => p.prod_available) ?? [];
 
   const addToCart = (product_id: number) => {
-    const p = available.find((p) => p.product_id === product_id);
+    const p = available.find((p) => p.prod_id === product_id);
     if (!p) return;
     setCart((prev) => {
       const existing = prev.find((i) => i.product_id === product_id);
       if (existing) return prev.map((i) => i.product_id === product_id ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { product_id, product_name: p.product_name, price: p.price, quantity: 1 }];
+      return [...prev, { product_id, product_name: p.prod_name, price: p.prod_price, quantity: 1 }];
     });
   };
 
@@ -48,26 +54,36 @@ export default function NewOrderPage() {
     if (!customerId) { setError("Please select a customer."); return; }
     if (cart.length === 0) { setError("Please add at least one product."); return; }
     if (fulfillmentType === "Delivery" && !address) { setError("Please enter a delivery address."); return; }
+    if (paymentMethod === "GCash" && !referenceNo.trim()) { setError("Please enter the GCash Reference Number."); return; }
 
     setSubmitting(true);
     try {
-      // 1. Create fulfillment
-      const fulfillment = await fulfillmentApi.create({
-        fulfillment_type: fulfillmentType,
-        ...(fulfillmentType === "Delivery"
-          ? { delivery: { address, fulfillment_id: 0 } }
-          : { pick_up: { preferred_time: preferredTime, pick_up_location: pickUpLocation, fulfillment_id: 0 } }),
+      // FIX: Transform array of objects with quantities into a flat array of IDs matching backend expectations
+      const flatProdIds: number[] = [];
+      cart.forEach((item) => {
+        for (let i = 0; i < item.quantity; i++) {
+          flatProdIds.push(item.product_id);
+        }
       });
 
-      // 2. Create order
-      const order = await ordersApi.create({
-        customer_id: customerId as number,
-        fulfillment_id: fulfillment.fulfillment_id,
-        payment_method: paymentMethod,
-        cart_items: cart.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
-      });
+      // FIX: Payload completely reconstructed to match 'CreateOrderBody' and the Python Dictionary schema
+      const orderPayload = {
+        cust_id: customerId,
+        total_amount: total,
+        ord_pay_meth: paymentMethod,
+        ord_f_type: fulfillmentType,
+        prod_ids: flatProdIds,
+        ...(paymentMethod === "GCash" ? { reference_no: referenceNo } : {}),
+      };
 
-      router.push(`/orders/${order.order_id}`);
+      // FIX: Combined action execution. Fulfillment creation is implicitly handled downstream by backend service
+      const response = await ordersApi.create(orderPayload) as any;
+
+      if (response.status === "Failed") {
+        throw new Error(response.error || "Backend failed to process order context.");
+      }
+
+      router.push(`/orders/${response.order_id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create order.");
     } finally {
@@ -93,12 +109,12 @@ export default function NewOrderPage() {
               <select
                 className="form-select"
                 value={customerId}
-                onChange={(e) => setCustomerId(Number(e.target.value))}
+                onChange={(e) => setCustomerId(e.target.value)}
               >
                 <option value="">— Select —</option>
                 {customers?.data.map((c) => (
-                  <option key={c.customer_id} value={c.customer_id}>
-                    {c.given_name} {c.last_name} ({c.email})
+                  <option key={c.cust_id} value={c.cust_id}>
+                    {c.cust_firstname} {c.cust_lastname} ({c.cust_email})
                   </option>
                 ))}
               </select>
@@ -110,25 +126,27 @@ export default function NewOrderPage() {
             <h3 style={{ fontSize: 15, marginBottom: 14 }}>Products</h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
               {available.map((p) => {
-                const inCart = cart.find((i) => i.product_id === p.product_id);
+                const inCart = cart.find((i) => i.product_id === p.prod_id);
                 return (
                   <div
-                    key={p.product_id}
+                    key={p.prod_id}
                     style={{
                       border: inCart ? "2px solid #0d1240" : "1.5px solid #e2ddd6",
                       borderRadius: 10, padding: 14,
                     }}
                   >
-                    <p style={{ fontWeight: 600, fontSize: 14 }}>{p.product_name}</p>
-                    <p style={{ color: "#c8883a", fontWeight: 700, margin: "4px 0 10px" }}>₱{Number(p.price).toFixed(2)}</p>
+                    {/* FIX: Field corrected to match Database DB schemas (prod_name) */}
+                    <p style={{ fontWeight: 600, fontSize: 14 }}>{p.prod_name}</p>
+                    {/* FIX: Field corrected to match Database DB schemas (prod_price) */}
+                    <p style={{ color: "#c8883a", fontWeight: 700, margin: "4px 0 10px" }}>₱{Number(p.prod_price).toFixed(2)}</p>
                     {inCart ? (
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <button className="btn btn-secondary" style={{ padding: "4px 10px" }} onClick={() => updateQty(p.product_id, inCart.quantity - 1)}>−</button>
+                        <button className="btn btn-secondary" style={{ padding: "4px 10px" }} onClick={() => updateQty(p.prod_id, inCart.quantity - 1)}>−</button>
                         <span style={{ fontWeight: 600 }}>{inCart.quantity}</span>
-                        <button className="btn btn-secondary" style={{ padding: "4px 10px" }} onClick={() => updateQty(p.product_id, inCart.quantity + 1)}>+</button>
+                        <button className="btn btn-secondary" style={{ padding: "4px 10px" }} onClick={() => updateQty(p.prod_id, inCart.quantity + 1)}>+</button>
                       </div>
                     ) : (
-                      <button className="btn btn-primary" style={{ fontSize: 13 }} onClick={() => addToCart(p.product_id)}>Add</button>
+                      <button className="btn btn-primary" style={{ fontSize: 13 }} onClick={() => addToCart(p.prod_id)}>Add</button>
                     )}
                   </div>
                 );
@@ -178,6 +196,19 @@ export default function NewOrderPage() {
                 <option value="GCash">GCash</option>
               </select>
             </div>
+
+            {/* ADDED: Context-aware rendering wrapper for Reference String inputs required by your Python service block */}
+            {paymentMethod === "GCash" && (
+              <div className="form-group" style={{ marginTop: 14 }}>
+                <label className="form-label">GCash Reference Number *</label>
+                <input 
+                  className="form-input" 
+                  value={referenceNo} 
+                  onChange={(e) => setReferenceNo(e.target.value)} 
+                  placeholder="Enter 13-digit reference number" 
+                />
+              </div>
+            )}
           </div>
         </div>
 

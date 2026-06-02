@@ -71,7 +71,22 @@ export const customersApi = {
 // PUT    /products/{product_id}
 // DELETE /products/{product_id}
 export const productsApi = {
-  list: () =>  request<import("@/types/mytypes").Product[]>("/products"),
+  list: (params?: { availableOnly?: boolean; search?: string }) => {
+    const searchParams = new URLSearchParams();
+    
+    if (params?.availableOnly) {
+      searchParams.append("available_only", "true");
+    }
+    if (params?.search) {
+      searchParams.append("search", params.search);
+    }
+
+    const queryString = searchParams.toString();
+    const url = `/products${queryString ? `?${queryString}` : ""}`;
+
+    return request<import("@/types/mytypes").Product[]>(url);
+  },
+  
   get: (id: number) => 
     // IS_MOCK ? getMock().mockProductsApi.get(id): 
     request<import("@/types/mytypes").Product>(`/products/${id}`),

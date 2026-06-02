@@ -33,7 +33,7 @@ export default function OrderPage() {
         if (user) setUserId(user.id);
 
         // 2. Fetch live products from backend
-        const productsList = await productsApi.list();
+        const productsList = await productsApi.list({ availableOnly: true });
 
         // 3. Map backend properties (prod_name) to frontend rendering variables (name)
         const mappedFlavors = productsList
