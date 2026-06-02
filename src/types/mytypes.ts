@@ -128,14 +128,18 @@ export interface LowStockItem extends InventoryItem {
 
 // ─── Inventory ───────────────────────────────────────────────────────────────
 // mytypes.ts
+export type UnitType = "pcs" | "ml" | "g" | "kg";
 export interface InventoryItem {
   inv_id: number;
   inv_ing_name: string;
   inv_stock: number;
-  inv_uom: string;
+  inv_uom: UnitType;
   inv_rt: number;
 }
 
+export interface LowStockItem extends InventoryItem {
+  is_low: boolean;
+}
 // ─── API Response Wrappers ───────────────────────────────────────────────────
 export interface ApiResponse<T> {
   data: T;

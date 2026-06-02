@@ -1,5 +1,6 @@
 // lib.ts
 // Set NEXT_PUBLIC_MOCK=true in .env.local to use mock data (no backend needed)
+import {InventoryItem, UnitType, LowStockItem} from "@/types/mytypes"
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 // ─── Real API ─────────────────────────────────────────────────────────────────
 // Real API inside api.ts
@@ -196,58 +197,62 @@ export const pickupApi = {
 // PUT    /inventory/{inv_id}
 // DELETE /inventory/{inv_id}
 // PATCH  /inventory/{inv_id}/adjust-stock
-export type UnitType = "pcs" | "ml" | "g" | "kg";
-
 export const inventoryApi = {
   // GET /inventory
-  list: () : Promise<import("@/types/mytypes").InventoryItem[]> =>
-      request<import("@/types/mytypes").InventoryItem[]>("/inventory"),
+  list: (): Promise<InventoryItem[]> => 
+    request<InventoryItem[]>("/inventory"),
 
   // GET /inventory/{inv_id}
-  get: (id: number) => request<import("@/types/mytypes").InventoryItem>(`/inventory/${id}`),
+  get: (id: number): Promise<InventoryItem> => 
+    request<InventoryItem>(`/inventory/${id}`),
 
-  // POST /inventory — body fields: inv_ing_name, inv_stock, inv_uom, inv_rt
+  // POST /inventory
   create: (body: {
     inv_ing_name: string;
     inv_stock?: number;
     inv_uom: UnitType;
     inv_rt?: number;
-  }) => request<import("@/types/mytypes").InventoryItem>("/inventory", {
-          method: "POST",
-          body: JSON.stringify(body),
-        }),
+  }): Promise<InventoryItem> => 
+    request<InventoryItem>("/inventory", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
-  // PUT /inventory/{inv_id} — update name, uom, reorder trigger
+  // PUT /inventory/{inv_id}
   update: (id: number, body: {
     inv_ing_name?: string;
+    inv_stock?: number; // FIXED: Added to fully mirror your backend DTO
     inv_uom?: UnitType;
     inv_rt?: number;
-  }) => request<import("@/types/mytypes").InventoryItem>(`/inventory/${id}`, {
-          method: "PUT",
-          body: JSON.stringify(body),
-        }),
+  }): Promise<InventoryItem> => 
+    request<InventoryItem>(`/inventory/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
 
   // DELETE /inventory/{inv_id}
-  delete: (id: number) => request(`/inventory/${id}`, { method: "DELETE" }),
+  delete: (id: number): Promise<{ message: string }> => 
+    request<{ message: string }>(`/inventory/${id}`, { method: "DELETE" }),
 
   // PATCH /inventory/{inv_id}/adjust-stock?amount={amount}
-  // amount > 0 to restock, amount < 0 to deduct
-  // No request body — backend reads `amount` as a query parameter
-  adjustStock: (id: number, amount: number) => request<import("@/types/mytypes").InventoryItem>(
-          `/inventory/${id}/adjust-stock?amount=${amount}`,
-          { method: "PATCH" }
-        ),
+  adjustStock: (id: number, amount: number): Promise<InventoryItem> => 
+    request<InventoryItem>(`/inventory/${id}/adjust-stock?amount=${amount}`, { 
+      method: "PATCH" 
+    }),
 
   // POST /inventory/deduct-by-order/{order_id}
-  deductByOrder: (orderId: number) => request(`/inventory/deduct-by-order/${orderId}`, { method: "POST" }),
+  deductByOrder: (orderId: number): Promise<{ message: string }> => 
+    request<{ message: string }>(`/inventory/deduct-by-order/${orderId}`, { 
+      method: "POST" 
+    }),
 
-  // Derived client-side — no dedicated /low-stock backend endpoint
-  lowStock: () => request<import("@/types/mytypes").InventoryItem[]>("/inventory").then(
-          (items) =>
-            items
-              .filter((i) => i.inv_stock <= i.inv_rt)
-              .map((i) => ({ ...i, is_low: true })) as import("@/types/mytypes").LowStockItem[]
-        ),
+  // Client-side local evaluation
+  lowStock: (): Promise<LowStockItem[]> => 
+    request<InventoryItem[]>("/inventory").then((items) =>
+      items
+        .filter((i) => i.inv_stock <= i.inv_rt)
+        .map((i) => ({ ...i, is_low: true }))
+    ),
 };
 
 // ─── Riders ───────────────────────────────────────────────────────────────────
