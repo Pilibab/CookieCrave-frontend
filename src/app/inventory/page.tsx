@@ -2,19 +2,18 @@
 
 import { useState } from "react";
 import { useFetch } from "@/hooks/useFetch";
-import { inventoryApi } from "@/lib/api";
+import { inventoryApi, UnitType } from "@/lib/api";
 import type { InventoryItem } from "@/types/mytypes";
 
-type UnitType = "pcs" | "ml" | "g" | "kg" | "trays";
 
-const UOM_OPTIONS: UnitType[] = ["pcs", "ml", "g", "kg", "trays"];
+
+const UOM_OPTIONS: UnitType[] = ["pcs", "ml", "g", "kg"];
 const FILTERS = ["All", "OK", "Low", "Critical"];
 
 // Unit conversion table — convert FROM any unit TO any unit
 // Strategy: convert everything to a base SI unit first, then to target
 const TO_BASE: Record<UnitType, number> = {
   pcs: 1,
-  trays: 1,
   ml: 0.001,   // base: liters
   g: 0.001,    // base: kg
   kg: 1,
@@ -23,7 +22,6 @@ const TO_BASE: Record<UnitType, number> = {
 // Which "dimension" each unit belongs to so we only convert within the same family
 const DIMENSION: Record<UnitType, string> = {
   pcs: "count",
-  trays: "count",
   ml: "volume",
   g: "mass",
   kg: "mass",
