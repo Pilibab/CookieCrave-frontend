@@ -1,46 +1,47 @@
 // frontend/src/app/page.tsx
 import "./globals.css"; // 
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+// import { cookies } from "next/headers";
 
-async function checkUserRole(): Promise<{ isAdmin: boolean } | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("sb-access-token")?.value;
+// async function checkUserRole(): Promise<{ isAdmin: boolean } | null> {
+//   const cookieStore = await cookies();
+//   const token = cookieStore.get("sb-access-token")?.value;
 
-  if (!token) {
-    console.log("[NEXT_SERVER] No sb-access-token cookie detected yet.");
-    return null;
-  }
+//   if (!token) {
+//     console.log("[NEXT_SERVER] No sb-access-token cookie detected yet.");
+//     return null;
+//   }
 
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BACKEND_URL}/api/auth/me`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      cache: "no-store", 
-    });
+//   try {
+//     const response = await fetch(`${process.env.NEXT_PUBLIC_API_BACKEND_URL}/api/auth/me`, {
+//       method: "GET",
+//       headers: {
+//         Authorization: `Bearer ${token}`,
+//       },
+//       cache: "no-store", 
+//     });
 
-    if (!response.ok) {
-      console.log(`[NEXT_SERVER] Backend rejected token with status: ${response.status}`);
-      return null;
-    }
+//     if (!response.ok) {
+//       console.log(`[NEXT_SERVER] Backend rejected token with status: ${response.status}`);
+//       return null;
+//     }
 
-    const data = await response.json();
-    const isAdmin = data.is_admin === true || data.role === "admin";
+//     const data = await response.json();
+//     const isAdmin = data.is_admin === true || data.role === "admin";
 
-    return { isAdmin };
-  } catch (error) {
-    console.error("[NEXT_SERVER] Backend connection failed:", error);
-    return null;
-  }
-}
+//     return { isAdmin };
+//   } catch (error) {
+//     console.error("[NEXT_SERVER] Backend connection failed:", error);
+//     return null;
+//   }
+// }
 
 export default async function RootPage() {
-  const session = await checkUserRole();
+  redirect("/auth/login")
+  // const session = await checkUserRole();
 
   // State 1: Anonymous public visitors
-  if (!session) {
+  // if (!session) {
     // return (
     //   <main className="p-8 max-w-4xl mx-auto flex flex-col items-center justify-center min-h-screen min-w-screen bg-(--navy)">
     //     <h1 className="text-[var(--warm-white)] text-4xl font-black mb-2">
@@ -53,15 +54,15 @@ export default async function RootPage() {
     //   </main>
     // );
     // auto redirct to login 
-    redirect("/auth/login")
-  }
+  //   redirect("/auth/login")
+  // }
 
   // State 2: Back-office management personnel
-  if (session.isAdmin) {
-    redirect("/dashboard");
-  } else {
-    redirect("/customer-ui")
-  }
+  // if (session.isAdmin) {
+  //   redirect("/dashboard");
+  // } else {
+  //   redirect("/customer-ui")
+  // }
 
   // State 3: Logged in customer storefront experience
   // return (
