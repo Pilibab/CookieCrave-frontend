@@ -2,35 +2,82 @@
 
 import React, { useState, useEffect } from "react";
 import CustomerNavbar from "../../../components/home-customer/CustomerNavbar";
+import { authApi, ordersApi, productsApi, cartApi } from "@/lib/api"; // Adjust this import path as needed
+import type { Order, Product, CartOrderLineItem } from "@/types/mytypes";
+
+type EnrichedOrder = Order & {
+  itemsSummary: string;
+};
 
 export default function TrackOrderPage() {
-  const [orderId, setOrderId] = useState("");
-  const [searched, setSearched] = useState(false);
+  const [orders, setOrders] = useState<EnrichedOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const savedOrderId = localStorage.getItem("latestOrderId");
+    async function loadCustomerOrders() {
+      try {
+        setLoading(true);
+        // 1. Get the current logged-in user profile
+        const authData = await authApi.me();
+        if (!authData?.user?.id) {
+          setError("You must be logged in to view your orders.");
+          setLoading(false);
+          return;
+        }
 
-    if (savedOrderId) {
-      setOrderId(savedOrderId);
-      setSearched(true);
+        const customerId = authData.user.id;
+
+        // 2. Fetch all orders for this customer and the master products directory concurrently
+        const [customerOrders, allProducts] = await Promise.all([
+          ordersApi.getByCustomer(customerId),
+          productsApi.list(),
+        ]);
+
+        // Create a fast lookup map for product names by their ID
+        const productMap = new Map<number, string>();
+        allProducts.forEach((p) => productMap.set(p.prod_id, p.prod_name));
+
+        // 3. For each order, fetch its cart items to compile the combined product names
+        const enrichedOrders: EnrichedOrder[] = await Promise.all(
+          customerOrders.map(async (order) => {
+            try {
+              const lineItems: CartOrderLineItem[] = await cartApi.getByOrder(order.ord_id);
+              
+              // Map line items to strings like "2x Cinnamon Cookie"
+              const namesArray = lineItems.map((item) => {
+                const prodName = productMap.get(item.prod_id) || "Unknown Cookie";
+                return `${item.cart_quan}x ${prodName}`;
+              });
+
+              return {
+                ...order,
+                itemsSummary: namesArray.length > 0 ? namesArray.join(", ") : "No items listed",
+              };
+            } catch {
+              // Fallback if individual cart retrieval fails
+              return {
+                ...order,
+                itemsSummary: "Cookie Krave Assortment",
+              };
+            }
+          })
+        );
+
+        // Sort orders so that the newest orders appear at the top
+        enrichedOrders.sort((a, b) => b.ord_id - a.ord_id);
+
+        setOrders(enrichedOrders);
+      } catch (err: any) {
+        console.error("Error loading tracking data:", err);
+        setError("Failed to sync your orders from the server.");
+      } finally {
+        setLoading(false);
+      }
     }
+
+    loadCustomerOrders();
   }, []);
-
-  const orderStatus = {
-    status: "Baking",
-    estimatedTime: "30–45 minutes",
-    steps: [
-      { label: "Order Received", complete: true },
-      { label: "Baking", complete: true },
-      { label: "Ready for Pickup", complete: false },
-      { label: "Completed", complete: false },
-    ],
-  };
-
-  const handleTrack = () => {
-    if (!orderId.trim()) return;
-    setSearched(true);
-  };
 
   return (
     <div
@@ -59,7 +106,7 @@ export default function TrackOrderPage() {
             marginBottom: "12px",
           }}
         >
-          Track Your Order
+          Your Order History
         </h1>
 
         <p
@@ -69,132 +116,141 @@ export default function TrackOrderPage() {
             marginBottom: "40px",
           }}
         >
-          Enter your Cookie Krave order ID below.
+          Real-time status and fulfillment logs for all your cookie purchases.
         </p>
 
-        <div
-          style={{
-            background: "#ffffff",
-            border: "1px solid #e2ddd6",
-            borderRadius: "16px",
-            padding: "24px",
-            marginBottom: "24px",
-          }}
-        >
-          <input
-            type="text"
-            placeholder="Enter Order ID"
-            value={orderId}
-            onChange={(e) => setOrderId(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "14px",
-              border: "1px solid #d8d2cb",
-              borderRadius: "8px",
-              marginBottom: "16px",
-              fontSize: "14px",
-              boxSizing: "border-box",
-            }}
-          />
+        {loading && (
+          <p style={{ textAlign: "center", color: "#6b6f8a", fontSize: "16px" }}>
+            Fetching your fresh orders...
+          </p>
+        )}
 
-          <button
-            onClick={handleTrack}
-            style={{
-              width: "100%",
-              background: "#0d1240",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "8px",
-              padding: "14px",
-              fontSize: "14px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Track Order
-          </button>
-        </div>
-
-        {searched && (
+        {error && (
           <div
             style={{
-              background: "#ffffff",
-              border: "1px solid #e2ddd6",
-              borderRadius: "16px",
-              padding: "32px",
+              background: "#fff5f5",
+              border: "1px solid #ffe3e3",
+              borderRadius: "12px",
+              padding: "20px",
+              color: "#e53e3e",
+              textAlign: "center",
             }}
           >
-            <h2
-              style={{
-                fontFamily: "'DM Serif Display', serif",
-                marginBottom: "16px",
-              }}
-            >
-              Order Status
-            </h2>
+            {error}
+          </div>
+        )}
 
-            <p style={{ color: "#6b6f8a", marginBottom: "8px" }}>
-              Order ID: <strong>{orderId}</strong>
-            </p>
+        {!loading && !error && orders.length === 0 && (
+          <p style={{ textAlign: "center", color: "#6b6f8a", fontSize: "15px" }}>
+            You haven't placed any cookie orders yet!
+          </p>
+        )}
 
-            <p style={{ marginBottom: "24px" }}>
-              Current Status:{" "}
-              <strong style={{ color: "#c8883a" }}>
-                {orderStatus.status}
-              </strong>
-            </p>
+        {!loading && !error && orders.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "20px",
+            }}
+          >
+            {orders.map((order) => {
+              // ─── EXTRACT LOGIC VARIABLE DECLARATIONS (Easy to maintain) ───
+              const orderId = `CK-${order.ord_id}`;
+              const product_name = order.itemsSummary;
+              const price = `₱${order.total_amount}`;
+              const status = order.order_status;
 
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px",
-              }}
-            >
-              {orderStatus.steps.map((step, index) => (
+              // Choose colors dynamically based on live status string
+              let statusColor = "#c8883a"; // Pending / Baking
+              if (status === "Completed") statusColor = "#2f855a";
+              if (status === "Cancelled") statusColor = "#e53e3e";
+              if (status === "Out for Delivery" || status === "For Pickup") statusColor = "#2b6cb0";
+
+              return (
                 <div
-                  key={index}
+                  key={order.ord_id}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
+                    background: "#ffffff",
+                    border: "1px solid #e2ddd6",
+                    borderRadius: "16px",
+                    padding: "28px",
+                    boxShadow: "0 2px 8px rgba(13, 18, 64, 0.02)",
                   }}
                 >
                   <div
                     style={{
-                      width: "20px",
-                      height: "20px",
-                      borderRadius: "50%",
-                      background: step.complete
-                        ? "#0d1240"
-                        : "#d9d9d9",
-                    }}
-                  />
-
-                  <span
-                    style={{
-                      color: step.complete ? "#0d1240" : "#888888",
-                      fontWeight: step.complete ? 600 : 400,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      borderBottom: "1px solid #f3efe9",
+                      paddingBottom: "16px",
+                      marginBottom: "16px",
                     }}
                   >
-                    {step.label}
-                  </span>
-                </div>
-              ))}
-            </div>
+                    <div>
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          color: "#8c91a6",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                        }}
+                      >
+                        Order ID
+                      </span>
+                      <h3
+                        style={{
+                          margin: "2px 0 0 0",
+                          fontSize: "18px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {orderId}
+                      </h3>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <span
+                        style={{
+                          background: `${statusColor}12`,
+                          color: statusColor,
+                          padding: "6px 14px",
+                          borderRadius: "999px",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {status}
+                      </span>
+                    </div>
+                  </div>
 
-            <div
-              style={{
-                marginTop: "24px",
-                padding: "16px",
-                background: "#fdf8f2",
-                borderRadius: "8px",
-                fontSize: "14px",
-              }}
-            >
-              Estimated Completion Time:
-              <strong>{orderStatus.estimatedTime}</strong>
-            </div>
+                  <div style={{ marginBottom: "16px" }}>
+                    <span style={{ fontSize: "13px", color: "#6b6f8a", display: "block", marginBottom: "4px" }}>
+                      Items Ordered
+                    </span>
+                    <p style={{ margin: 0, fontSize: "15px", fontWeight: 500, color: "#0d1240", lineHeight: 1.4 }}>
+                      {product_name}
+                    </p>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      background: "#fdfbfa",
+                      padding: "12px 16px",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <span style={{ fontSize: "14px", color: "#6b6f8a" }}>Amount Paid</span>
+                    <strong style={{ fontSize: "18px", color: "#0d1240" }}>{price}</strong>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

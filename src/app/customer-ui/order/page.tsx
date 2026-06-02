@@ -1,30 +1,63 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import CustomerNavbar from "../../../components/home-customer/CustomerNavbar";
-
-const flavors = [
-  { id: 1, name: "Mango Macadamia Cookie", badge: "May's Krave", monthly: true, price: 120, image: "/images/mango.jpg" },
-  { id: 2, name: "Strawberry Creamcheese Cookie", monthly: false, price: 100, image: "/images/strawberry.jpg" },
-  { id: 3, name: "Cinnamon Cookie", monthly: false, price: 100, image: "/images/cinnamon.jpg" },
-  { id: 4, name: "S'more Cookie", monthly: false, price: 100, image: "/images/smore.jpg" },
-  { id: 5, name: "Matcha Strawberry Creamcheese Cookie", monthly: false, price: 100, image: "/images/MS.jpg" },
-];
+import { productsApi, ordersApi, authApi, CreateOrderBody } from "@/lib/api"; // Adjust this import path as needed
 
 type CartItem = { id: number; name: string; price: number; quantity: number; image: string };
 
 export default function OrderPage() {
+  // ─── NEW STATE FOR BACKEND DATA ──────────────────────────────────────────
+  const [flavors, setFlavors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+  
+  // ─── EXISTING STATE ──────────────────────────────────────────────────────
   const [cart, setCart] = useState<CartItem[]>([]);
   const [submissionState, setSubmissionState] = useState({ 
-  submitted: false, 
-  orderId: "", 
-  method: "" 
-});
-
+    submitted: false, 
+    orderId: "", 
+    method: "" 
+  });
   const [contactNumber, setContactNumber] = useState("");
   const [fulfillment, setFulfillment] = useState("pickup");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [address, setAddress] = useState("");
+
+  // ─── FETCH BACKEND DATA ON MOUNT ─────────────────────────────────────────
+  useEffect(() => {
+    async function fetchPageData() {
+      try {
+        // 1. Get the current logged-in customer's ID
+        const { user } = await authApi.me().catch(() => ({ user: null }));
+        if (user) setUserId(user.id);
+
+        // 2. Fetch live products from backend
+        const productsList = await productsApi.list();
+
+        // 3. Map backend properties (prod_name) to frontend rendering variables (name)
+        const mappedFlavors = productsList
+          .filter(p => p.prod_available) // Only display cookies marked as available
+          .map((p) => ({
+            id: p.prod_id,
+            name: p.prod_name,
+            price: p.prod_price,
+            image: p.prod_image_url || "/images/CKWebLogo.png", // Fallback if no image URL
+            monthly: false, // Update this if your DB has a monthly flag
+            badge: "Monthly Krave"
+          }));
+        
+        setFlavors(mappedFlavors);
+      } catch (error) {
+        console.error("Failed to fetch data:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPageData();
+  }, []);
+
+  // ─── CART LOGIC (UNCHANGED) ──────────────────────────────────────────────
   const addToCart = (flavor: typeof flavors[0]) => {
     setCart((prev) => {
       const existing = prev.find((i) => i.id === flavor.id);
@@ -43,49 +76,60 @@ export default function OrderPage() {
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const handleSubmit = () => {
-  if (cart.length === 0) {
-    alert("Please add at least one cookie.");
-    return;
-  }
+  // ─── SUBMIT ORDER TO BACKEND ─────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (cart.length === 0) return alert("Please add at least one cookie.");
+    if (!contactNumber.trim()) return alert("Please enter your contact number.");
+    if (fulfillment === "delivery" && !address.trim()) return alert("Please enter your delivery address.");
+    if (!userId) return alert("You must be logged in to place an order.");
 
-  if (!contactNumber.trim()) {
-    alert("Please enter your contact number.");
-    return;
-  }
+    try {
+      // 1. Flatten the cart into an array of product IDs as expected by backend CreateOrderBody
+      // E.g. 2 Mango cookies (ID: 1) = [1, 1]
+      const prod_ids: number[] = [];
+      cart.forEach(item => {
+        for (let i = 0; i < item.quantity; i++) {
+          prod_ids.push(item.id);
+        }
+      });
 
-  if (fulfillment === "delivery" && !address.trim()) {
-    alert("Please enter your delivery address.");
-    return;
-  }
+      // 2. Prepare Payload mapping local state to strict Typescript API types
+      const payload: CreateOrderBody = {
+        cust_id: userId,
+        total_amount: total,
+        ord_pay_meth: paymentMethod === "gcash" ? "GCash" : "Cash",
+        ord_f_type: fulfillment === "delivery" ? "Delivery" : "Pick_Up",
+        prod_ids: prod_ids,
+        // reference_no is handled on the next screen if GCash!
+      };
 
-  const newOrderId = `CK-${Date.now()}`;
+      // 3. Post to API
+      const createdOrder = await ordersApi.create(payload);
 
-  localStorage.setItem("latestOrderId", newOrderId);
+      // 4. Update UI Success state using returned DB Order ID
+      localStorage.setItem("latestOrderId", String(createdOrder.ord_id));
+      setSubmissionState({
+        submitted: true,
+        orderId: `CK-${createdOrder.ord_id}`,
+        method: paymentMethod, 
+      });
 
-  setSubmissionState({
-    submitted: true,
-    orderId: newOrderId,
-    method: paymentMethod, 
-  });
-};
+    } catch (error) {
+      console.error("Order creation failed:", error);
+      alert("Failed to submit order. Please try again.");
+    }
+  };
 
- if (submissionState.submitted) {
+  // ─── RENDER SUBMITTED STATE (UNCHANGED) ──────────────────────────────────
+  if (submissionState.submitted) {
     return (
       <div style={{ fontFamily: "'DM Sans', sans-serif", background: "#fdf8f2", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-        {/* 🏛️ This container card was missing! */}
         <div style={{ background: "#ffffff", border: "1px solid #e2ddd6", borderRadius: "16px", padding: "40px", textAlign: "center", maxWidth: "480px", width: "100%", boxSizing: "border-box" }}>
           
-          {/* ✅ Your new Order Placed Image */}
           <div style={{ width: "140px", height: "140px", margin: "0 auto 20px auto", overflow: "hidden", borderRadius: "50%" }}>
-            <img 
-              src="/images/OrderPlaced.jpg" 
-              alt="Order Placed Graphic" 
-              style={{ width: "100%", height: "100%", objectFit: "cover" }} 
-            />
+            <img src="/images/OrderPlaced.jpg" alt="Order Placed Graphic" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
 
-          {/* 📝 Restored Heading */}
           <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "32px", color: "#0d1240", marginBottom: "12px" }}>
             Order Placed!
           </h2>
@@ -104,14 +148,13 @@ export default function OrderPage() {
               You can cancel your order within the next 5 minutes.
           </p>
           <button 
-            onClick={() => { /* Add your cancellation API call here */ alert("Order Cancelled"); }}
+            onClick={() => { alert("Order Cancelled"); }}
             style={{ background: "#e53e3e", color: "#fff", border: "none", borderRadius: "6px", padding: "6px 16px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
           >
             Cancel Order
           </button>
         </div>
 
-        {/* 2. THE CONDITIONAL GCASH FLOW STEP */}
         {submissionState.method === "gcash" && (
           <div style={{ background: "#f4f7ff", border: "1px solid #d0e0ff", borderRadius: "12px", padding: "20px", marginBottom: "24px", textAlign: "center" }}>
             <h4 style={{ color: "#0d1240", margin: "0 0 8px 0" }}> Complete Your GCash Payment</h4>
@@ -119,14 +162,9 @@ export default function OrderPage() {
               Scan the QR code below to pay <strong>₱{total}</strong>, then enter the Reference Number.
             </p>
             
-           {/* ✅ ACTUAL GCASH QR CODE IMAGE */}
-    <div style={{ width: "250px", height: "250px", margin: "0 auto 16px auto", borderRadius: "12px", overflow: "hidden", border: "1px solid #cbd5e1", background: "#fff", padding: "8px", boxSizing: "border-box" }}>
-      <img 
-        src="/images/GcashQRCode.png" 
-        alt="GCash QR Code" 
-        style={{ width: "100%", height: "100%", objectFit: "contain" }} 
-      />
-    </div>
+            <div style={{ width: "250px", height: "250px", margin: "0 auto 16px auto", borderRadius: "12px", overflow: "hidden", border: "1px solid #cbd5e1", background: "#fff", padding: "8px", boxSizing: "border-box" }}>
+              <img src="/images/GcashQRCode.png" alt="GCash QR Code" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+            </div>
 
             <input 
               type="text" 
@@ -134,7 +172,7 @@ export default function OrderPage() {
               style={{ width: "100%", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", textAlign: "center", boxSizing: "border-box", marginBottom: "12px" }}
             />
             <button 
-              onClick={() => { /* Save Reference number to your teammate's new table */ alert("Payment submitted!"); }}
+              onClick={() => { alert("Payment submitted!"); }}
               style={{ width: "100%", background: "#1a56db", color: "#fff", border: "none", borderRadius: "6px", padding: "10px 0", fontWeight: 600, cursor: "pointer", fontSize: "13px" }}
             >
               Submit Payment Details
@@ -152,9 +190,9 @@ export default function OrderPage() {
   );
 }
 
+  // ─── MAIN RENDER LOOP (UNCHANGED) ────────────────────────────────────────
   return (
     <div style={{ fontFamily: "'DM Sans', sans-serif", background: "#fdf8f2", minHeight: "100vh", color: "#0d1240" }}>
-
       <CustomerNavbar />
 
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px" }}>
@@ -163,46 +201,52 @@ export default function OrderPage() {
             <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "24px", color: "#0d1240", marginBottom: "20px" }}>
               Choose Your Cookies
             </h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {flavors.map((flavor) => (
-                <div key={flavor.id} style={{ background: "#ffffff", border: "1px solid #e2ddd6", borderRadius: "12px", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                    <div style={{ width: "56px", height: "56px", borderRadius: "10px", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8f2e4" }}>
-                      <img src={flavor.image} alt={flavor.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    </div>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontWeight: 600, fontSize: "15px", color: "#0d1240" }}>{flavor.name}</span>
-                        {flavor.monthly && (
-                          <span style={{ background: "#fde8d8", color: "#7d3200", fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "999px", letterSpacing: "0.5px" }}>
-                            {flavor.badge}
-                          </span>
-                        )}
+
+            {/* Added loading check so UI doesn't crash while fetching */}
+            {loading ? (
+               <p>Loading fresh cookies from the oven...</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {flavors.map((flavor) => (
+                  <div key={flavor.id} style={{ background: "#ffffff", border: "1px solid #e2ddd6", borderRadius: "12px", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                      <div style={{ width: "56px", height: "56px", borderRadius: "10px", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8f2e4" }}>
+                        <img src={flavor.image} alt={flavor.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       </div>
-                      <div style={{ fontSize: "13px", color: "#6b6f8a", marginTop: "4px" }}>₱{flavor.price} per cookie</div>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ fontWeight: 600, fontSize: "15px", color: "#0d1240" }}>{flavor.name}</span>
+                          {flavor.monthly && (
+                            <span style={{ background: "#fde8d8", color: "#7d3200", fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "999px", letterSpacing: "0.5px" }}>
+                              {flavor.badge}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "13px", color: "#6b6f8a", marginTop: "4px" }}>₱{flavor.price} per cookie</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <button
+                        onClick={() => removeFromCart(flavor.id)}
+                        disabled={cart.find((i) => i.id === flavor.id)?.quantity === 0}
+                        style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1.5px solid #e2ddd6", background: "#fff", fontSize: "18px", cursor: cart.find((i) => i.id === flavor.id)?.quantity === 0 ? "not-allowed" : "pointer", color: "#0d1240", opacity: cart.find((i) => i.id === flavor.id)?.quantity === 0 ? 0.3 : 1, display: "flex", alignItems: "center", justifyContent: "center" }}
+                      >
+                        −
+                      </button>
+                      <span style={{ fontSize: "16px", fontWeight: 600, minWidth: "20px", textAlign: "center" }}>
+                        {cart.find((i) => i.id === flavor.id)?.quantity ?? 0}
+                      </span>
+                      <button
+                        onClick={() => addToCart(flavor)}
+                        style={{ width: "32px", height: "32px", borderRadius: "50%", border: "none", background: "#0d1240", fontSize: "18px", cursor: "pointer", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      >
+                        +
+                      </button>
                     </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <button
-                      onClick={() => removeFromCart(flavor.id)}
-                      disabled={cart.find((i) => i.id === flavor.id)?.quantity === 0}
-                      style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1.5px solid #e2ddd6", background: "#fff", fontSize: "18px", cursor: cart.find((i) => i.id === flavor.id)?.quantity === 0 ? "not-allowed" : "pointer", color: "#0d1240", opacity: cart.find((i) => i.id === flavor.id)?.quantity === 0 ? 0.3 : 1, display: "flex", alignItems: "center", justifyContent: "center" }}
-                    >
-                      −
-                    </button>
-                    <span style={{ fontSize: "16px", fontWeight: 600, minWidth: "20px", textAlign: "center" }}>
-                      {cart.find((i) => i.id === flavor.id)?.quantity ?? 0}
-                    </span>
-                    <button
-                      onClick={() => addToCart(flavor)}
-                      style={{ width: "32px", height: "32px", borderRadius: "50%", border: "none", background: "#0d1240", fontSize: "18px", cursor: "pointer", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
             <aside style={{ position: "sticky", top: "80px" }}>
@@ -222,119 +266,65 @@ export default function OrderPage() {
                   ))}
                 </div>
               )}
-              <hr
-  style={{
-    border: "none",
-    borderTop: "1px solid #e2ddd6",
-    margin: "20px 0",
-  }}
-/>
+              <hr style={{ border: "none", borderTop: "1px solid #e2ddd6", margin: "20px 0" }} />
 
-<h4
-  style={{
-    marginBottom: "12px",
-    color: "#0d1240",
-  }}
->
-  Customer Details
-</h4>
+              <h4 style={{ marginBottom: "12px", color: "#0d1240" }}>Customer Details</h4>
 
-<input
-  type="text"
-  placeholder="Contact Number"
-  value={contactNumber}
-  onChange={(e) => setContactNumber(e.target.value)}
-  style={{
-    width: "100%",
-    padding: "12px",
-    border: "1px solid #e2ddd6",
-    borderRadius: "8px",
-    marginBottom: "12px",
-    boxSizing: "border-box",
-  }}
-/>
+              <input
+                type="text"
+                placeholder="Contact Number"
+                value={contactNumber}
+                onChange={(e) => setContactNumber(e.target.value)}
+                style={{ width: "100%", padding: "12px", border: "1px solid #e2ddd6", borderRadius: "8px", marginBottom: "12px", boxSizing: "border-box" }}
+              />
 
-<select
-  value={fulfillment}
-  onChange={(e) => {
-    const value = e.target.value;
-    setFulfillment(value);
+              <select
+                value={fulfillment}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFulfillment(value);
+                  if (value === "delivery") setPaymentMethod("gcash");
+                }}
+                style={{ width: "100%", padding: "12px", border: "1px solid #e2ddd6", borderRadius: "8px", marginBottom: "12px" }}
+              >
+                <option value="pickup">Pickup</option>
+                <option value="delivery">Delivery</option>
+              </select>
 
-    if (value === "delivery") {
-      setPaymentMethod("gcash");
-    }
-  }}
-  style={{
-    width: "100%",
-    padding: "12px",
-    border: "1px solid #e2ddd6",
-    borderRadius: "8px",
-    marginBottom: "12px",
-  }}
->
-  <option value="pickup">Pickup</option>
-  <option value="delivery">Delivery</option>
-</select>
+              {fulfillment === "delivery" && (
+                <>
+                  <textarea
+                    placeholder="Delivery Address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    style={{ width: "100%", padding: "12px", border: "1px solid #e2ddd6", borderRadius: "8px", marginBottom: "12px", boxSizing: "border-box" }}
+                  />
+                  <div style={{ background: "#fde8d8", color: "#7d3200", padding: "12px", borderRadius: "8px", fontSize: "12px", lineHeight: 1.5, marginBottom: "12px" }}>
+                    Delivery fee is not included in the cookie total. Delivery will be booked through GrabExpress and the fee depends on your location. We will contact you using the provided phone number to confirm the exact delivery fee.
+                  </div>
+                </>
+              )}
 
-{fulfillment === "delivery" && (
-  <>
-    <textarea
-      placeholder="Delivery Address"
-      value={address}
-      onChange={(e) => setAddress(e.target.value)}
-      style={{
-        width: "100%",
-        padding: "12px",
-        border: "1px solid #e2ddd6",
-        borderRadius: "8px",
-        marginBottom: "12px",
-        boxSizing: "border-box",
-      }}
-    />
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                style={{ width: "100%", padding: "12px", border: "1px solid #e2ddd6", borderRadius: "8px", marginBottom: "20px" }}
+              >
+                {fulfillment === "pickup" ? (
+                  <>
+                    <option value="cash">Cash</option>
+                    <option value="gcash">GCash</option>
+                  </>
+                ) : (
+                  <option value="gcash">GCash</option>
+                )}
+              </select>
 
-    <div
-      style={{
-        background: "#fde8d8",
-        color: "#7d3200",
-        padding: "12px",
-        borderRadius: "8px",
-        fontSize: "12px",
-        lineHeight: 1.5,
-        marginBottom: "12px",
-      }}
-    >
-      Delivery fee is not included in the cookie total.
-      Delivery will be booked through GrabExpress and the fee
-      depends on your location. We will contact you using the
-      provided phone number to confirm the exact delivery fee.
-    </div>
-  </>
-)}
-
-<select
-  value={paymentMethod}
-  onChange={(e) => setPaymentMethod(e.target.value)}
-  style={{
-    width: "100%",
-    padding: "12px",
-    border: "1px solid #e2ddd6",
-    borderRadius: "8px",
-    marginBottom: "20px",
-  }}
->
-  {fulfillment === "pickup" ? (
-    <>
-      <option value="cash">Cash</option>
-      <option value="gcash">GCash</option>
-    </>
-  ) : (
-    <option value="gcash">GCash</option>
-  )}
-</select>
               <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, marginBottom: "20px" }}>
                 <span>Total</span>
                 <span>₱{total}</span>
               </div>
+
               <button onClick={handleSubmit} style={{ width: "100%", background: "#0d1240", color: "#fff", border: "none", borderRadius: "10px", padding: "12px 0", fontWeight: 600, cursor: "pointer" }}>
                 Place Order
               </button>

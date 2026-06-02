@@ -41,7 +41,7 @@ export default function AuthCallbackLoading() {
                         } else {
                             // user is customer 
                             console.log("customer is logged in ");
-                            
+                            router.push("/customer-ui");
                         }
                     } else {
                         router.push("/auth/login");

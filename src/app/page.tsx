@@ -41,37 +41,41 @@ export default async function RootPage() {
 
   // State 1: Anonymous public visitors
   if (!session) {
-    return (
-      <main className="p-8 max-w-4xl mx-auto flex flex-col items-center justify-center min-h-screen min-w-screen bg-(--navy)">
-        <h1 className="text-[var(--warm-white)] text-4xl font-black mb-2">
-          Welcome to CookieKrave 🍪
-        </h1>
-        <p className="text-gray-400 mb-6">Delicious creations are baking. Sign in to place your orders!</p>
-        <a href="/auth/login" className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors">
-          Go to Sign In
-        </a>
-      </main>
-    );
+    // return (
+    //   <main className="p-8 max-w-4xl mx-auto flex flex-col items-center justify-center min-h-screen min-w-screen bg-(--navy)">
+    //     <h1 className="text-[var(--warm-white)] text-4xl font-black mb-2">
+    //       Welcome to CookieKrave 🍪
+    //     </h1>
+    //     <p className="text-gray-400 mb-6">Delicious creations are baking. Sign in to place your orders!</p>
+    //     <a href="" className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors">
+    //       Go to Sign In
+    //     </a>
+    //   </main>
+    // );
+    // auto redirct to login 
+    redirect("/auth/login")
   }
 
   // State 2: Back-office management personnel
   if (session.isAdmin) {
     redirect("/dashboard");
+  } else {
+    redirect("/customer-ui")
   }
 
   // State 3: Logged in customer storefront experience
-  return (
-    // ! redirect to store 
-    <main className="p-8 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
-        <h1 className="text-2xl font-bold">CookieKrave Storefront 🍪</h1>
-        <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20">
-          Customer Account Connected
-        </span>
-      </div>
-      <div className="p-12 text-center bg-gray-900/50 rounded-xl border border-gray-800">
-        <p className="text-gray-400">Our signature baking menu and product catalogs are spinning up!</p>
-      </div>
-    </main>
-  );
+  // return (
+  //   // ! redirect to store 
+  //   <main className="p-8 max-w-6xl mx-auto">
+  //     <div className="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+  //       <h1 className="text-2xl font-bold">CookieKrave Storefront 🍪</h1>
+  //       <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-500/10 text-emerald-400 rounded-full border border-emerald-500/20">
+  //         Customer Account Connected
+  //       </span>
+  //     </div>
+  //     <div className="p-12 text-center bg-gray-900/50 rounded-xl border border-gray-800">
+  //       <p className="text-gray-400">Our signature baking menu and product catalogs are spinning up!</p>
+  //     </div>
+  //   </main>
+  // );
 }
