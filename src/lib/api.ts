@@ -57,11 +57,20 @@ export const authApi = {
 // PUT    /api/customers/{customer_id}
 // DELETE /api/customers/{customer_id}
 export const customersApi = {
-  list: (page = 1, limit = 20) =>  request<import("@/types/mytypes").PaginatedResponse<import("@/types/mytypes").Customer>>(`/api/customers?page=${page}&limit=${limit}`),
-  get: (id: string) =>  request<import("@/types/mytypes").Customer>(`/customers/${id}`),
-  create: (body: Partial<import("@/types/mytypes").Customer>) => request<import("@/types/mytypes").Customer>("/customers", { method: "POST", body: JSON.stringify(body) }),
-  update: (id: number, body: Partial<import("@/types/mytypes").Customer>) => request<import("@/types/mytypes").Customer>(`/customers/${id}`, { method: "PUT", body: JSON.stringify(body) }),
-  delete: (id: number) => request(`/customers/${id}`, { method: "DELETE" }),
+  // FIXED: No pagination arguments, no query string, strictly returns Customer array
+  list: () => request<import("@/types/mytypes").Customer[]>("/customers"),
+  
+  get: (id: string) => 
+    request<import("@/types/mytypes").Customer>(`/customers/${id}`),
+    
+  create: (body: Partial<import("@/types/mytypes").Customer>) => 
+    request<import("@/types/mytypes").Customer>("/customers", { method: "POST", body: JSON.stringify(body) }),
+    
+  update: (id: string, body: Partial<import("@/types/mytypes").Customer>) => 
+    request<import("@/types/mytypes").Customer>(`/customers/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+    
+  delete: (id: string) => 
+    request(`/customers/${id}`, { method: "DELETE" }),
 };
 
 // ─── Products ─────────────────────────────────────────────────────────────────
