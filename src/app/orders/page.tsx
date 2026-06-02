@@ -190,7 +190,7 @@ export default function OrdersPage() {
                             }}
                             value={ord.order_status ?? "Pending"}
                             disabled={isUpdating}
-                            onChange={(e) => handleStatusChange(orderId, ord, e.target.value)}
+                            onChange={(e) => handleStatusChange(orderId, ord, e.target.value as OrderStatus)}
                           >
                             {STATUS_OPTIONS.map((s) => (
                               <option key={s} value={s} style={{ backgroundColor: "#141210", color: "#fff" }}>

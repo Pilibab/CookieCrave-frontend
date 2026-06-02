@@ -112,10 +112,15 @@ export const productsApi = {
 // DELETE /bom/{bom_id}
 // GET    /bom/product/{product_id}      — ingredients for a product
 // GET    /bom/ingredient/{inventory_id} — products using an ingredient
+export interface BOMBulkCreate {
+  prod_id: number;
+  ingredients: { inv_id: number; bom_quan_req: number }[];
+}
+
 export const bomApi = {
   list: () => request<import("@/types/mytypes").BOMEntry[]>("/bom"),
   get: (id: number) => request<import("@/types/mytypes").BOMEntry>(`/bom/${id}`),
-  create: (body: Partial<import("@/types/mytypes").BOMEntry>) =>  request<import("@/types/mytypes").BOMEntry>("/bom", { method: "POST", body: JSON.stringify(body) }),
+  create: (body: import("@/types/mytypes").BOMBulkCreate) => request<import("@/types/mytypes").BOMEntry[]>("/bom", { method: "POST", body: JSON.stringify(body) }),
   update: (id: number, body: Partial<import("@/types/mytypes").BOMEntry>) =>  request<import("@/types/mytypes").BOMEntry>(`/bom/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   delete: (id: number) =>  request(`/bom/${id}`, { method: "DELETE" }),
   getByProduct: (productId: number) => request<import("@/types/mytypes").BOMEntry[]>(`/bom/product/${productId}`),
