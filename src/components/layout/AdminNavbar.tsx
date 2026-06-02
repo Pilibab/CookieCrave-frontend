@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image"; // Import Next.js Image component for optimized rendering
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -20,8 +21,20 @@ export default function AdminNavbar() {
   return (
     <div className="navbar-wrapper">
       <nav className="navbar">
-        <span className="navbar-brand">cookie krave</span>
+
+        <Link href="/dashboard" className="flex items-center">
+          <Image 
+            src="/CKWebLogo.png" 
+            alt="Cookie Krave Logo" 
+            width={180}            // Sets a base layout width constraint
+            height={52}            // Matches the height from your global.css
+            className="navbar-logo"
+            priority               // Ensures the logo loads instantly on page render
+          />
+        </Link>
+        
         <div className="navbar-divider" />
+        
         <div className="navbar-nav">
           {NAV.map(({ href, label }) => {
             const active = pathname === href || pathname.startsWith(href + "/");

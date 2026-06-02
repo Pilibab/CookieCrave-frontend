@@ -16,7 +16,7 @@
   --border:     #e2e4ef;
   --text:       #0d1240;
   --text-muted: #6b6f8a;
-  --navbar-h:   72px;
+  --navbar-h:   84px;  /* Increased from 72px to make the topbar thicker */
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -43,20 +43,20 @@ a { color: inherit; text-decoration: none; }
   height: var(--navbar-h);
   background: var(--warm-white);
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;     /* Keeps items in a perfectly flat single horizontal line */
   align-items: center;
-  align-content: center;
-  padding: 0 32px 6px;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0 0 22px 22px;
-  box-shadow: 0 6px 24px rgba(13,18,64,0.13), 0 1.5px 4px rgba(13,18,64,0.07);
+  padding: 0 40px;       /* Spacing matching the image_49ad82.png outer container bounds */
+  border-bottom: 1px solid #e5e7eb;
+  border-radius: 0;      /* Removed original rounded corners to match the clean layout */
+  box-shadow: none;      /* Removed old shadows for a flat, clean backdrop look */
   gap: 0;
 }
 
+/* Tailored perfectly to fit your image file "CKWebLogo.png" cleanly without warping */
 .navbar-logo {
-  height: 28px;
-  width: auto;
-  object-fit: contain;
+  height: 25px;          /* Scaled perfectly to fit nicely within the thicker 88px height */
+  width: auto;           /* Maintains original aspect ratio automatically */
+  object-fit: contain;   /* Safeguards graphic rendering from stretching */
   display: block;
 }
 
@@ -97,50 +97,81 @@ a { color: inherit; text-decoration: none; }
 .navbar-nav {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;             /* Clean navigation gaps */
   margin-left: auto;
 }
 
 .navbar-link {
-  padding: 7px 15px;
-  border-radius: 6px;
-  font-size: 13px;
+  position: relative;
+  padding: 8px 12px;
+  font-size: 14px;
   font-weight: 500;
-  color: var(--text);
-  transition: background 0.15s;
+  color: #555875;        /* Soft navy tone matching the image's inactive links */
+  transition: color 0.15s;
   text-decoration: none;
 }
 
-.navbar-link:hover { background: var(--cream); }
-.navbar-link.active {
-  text-decoration: underline;
-  font-weight: 600;
+.navbar-link:hover { 
+  background: transparent; 
   color: var(--navy);
+}
+
+.navbar-link.active {
+  text-decoration: none;  /* Removed browser text-underline fallback line */
+  font-weight: 700;
+  color: var(--navy);
+}
+
+/* Custom hard-line block accent sitting perfectly below active links like "Home" */
+.navbar-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 12px;
+  right: 12px;
+  height: 3px;
+  background-color: var(--navy);
+  border-radius: 2px;
 }
 
 .navbar-user {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-left: 32px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #9ca3af;
+  gap: 12px;
+  margin-left: 24px;
 }
 
+/* Cart Container (Solid dark navy box) */
 .navbar-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;   /* Exact rounded block profile from image_49ad82.png */
   background: var(--navy);
-  color: #fff;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 16px;
   overflow: hidden;
   flex-shrink: 0;
+  cursor: pointer;
+  border: none;
+}
+
+/* User Profile Container (Light outline box) */
+.navbar-user-outline {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--navy);
+  border: 1px solid #e5e7eb; /* Fine light border wrap */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+  cursor: pointer;
 }
 
 /* ── Layout ──────────────────────────────────────────── */
@@ -480,5 +511,5 @@ tr:hover td {
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 768px) {
   .main-content, .main-content-wide { padding: 16px; }
-  .navbar { padding: 0 16px; }
+  .navbar { padding: 0 16px; flex-wrap: wrap; }
 }

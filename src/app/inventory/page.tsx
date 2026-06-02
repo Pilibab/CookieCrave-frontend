@@ -3,371 +3,402 @@
 import { useState } from "react";
 import { useFetch } from "@/hooks/useFetch";
 import { inventoryApi } from "@/lib/api";
-import type { InventoryItem, UnitType } from "@/types";
+import type { InventoryItem } from "@/types/mytypes";
 
-// Matches backend UnitType enum exactly
+type UnitType = "pcs" | "ml" | "g" | "kg" | "trays";
+
 const UOM_OPTIONS: UnitType[] = ["pcs", "ml", "g", "kg", "trays"];
-
-// Stock level filters — inventory has no order-style statuses
 const FILTERS = ["All", "OK", "Low", "Critical"];
 
-export default function InventoryPage() {
-  const { data: items, loading, refetch } = useFetch<InventoryItem[]>(inventoryApi.list);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<InventoryItem | null>(null);
-  const [activeFilter, setActiveFilter] = useState("All");
+// Unit conversion table — convert FROM any unit TO any unit
+// Strategy: convert everything to a base SI unit first, then to target
+const TO_BASE: Record<UnitType, number> = {
+  pcs: 1,
+  trays: 1,
+  ml: 0.001,   // base: liters
+  g: 0.001,    // base: kg
+  kg: 1,
+};
 
-  // Fallback safe checks for thresholds
-  const isLow      = (item: InventoryItem) => (item.inv_stock ?? 0) <= (item.inv_rt ?? 0);
-  const isCritical = (item: InventoryItem) => (item.inv_stock ?? 0) <= (item.inv_rt ?? 0) * 0.5;
+// Which "dimension" each unit belongs to so we only convert within the same family
+const DIMENSION: Record<UnitType, string> = {
+  pcs: "count",
+  trays: "count",
+  ml: "volume",
+  g: "mass",
+  kg: "mass",
+};
 
-  const allItems = items ?? [];
-
-  const filtered = allItems.filter((item) => {
-    if (activeFilter === "All")      return true;
-    if (activeFilter === "Critical") return isCritical(item);
-    if (activeFilter === "Low")      return isLow(item) && !isCritical(item);
-    if (activeFilter === "OK")       return !isLow(item);
-    return true;
-  });
-
-  const lowItems = allItems.filter(isLow);
-  const lowNames = lowItems.slice(0, 2).map((i) => i.inv_ing_name || "Unknown").join(", ");
-
-  const handleReorder = async (id: number) => {
-    const item = allItems.find((i) => i.inv_id === id);
-    if (!item) return;
-    const currentRt = item.inv_rt ?? 0;
-    const currentStock = item.inv_stock ?? 0;
-    const deficit = currentRt * 2 - currentStock;
-    if (deficit > 0) await inventoryApi.adjustStock(id, deficit);
-    refetch();
-  };
-
-  const handleReorderAll = async () => {
-    for (const item of lowItems) {
-      const currentRt = item.inv_rt ?? 0;
-      const currentStock = item.inv_stock ?? 0;
-      const deficit = currentRt * 2 - currentStock;
-      if (deficit > 0) await inventoryApi.adjustStock(item.inv_id, deficit);
-    }
-    refetch();
-  };
-
-  return (
-    <div>
-      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div>
-          <h1 className="page-title" style={{ color: "#0f172a", fontSize: 28, fontWeight: 700, margin: 0 }}>Inventory</h1>
-          <p style={{ fontSize: 13, color: "#64748b", marginTop: 4, margin: 0 }}>
-            {allItems.length} ingredients
-            {lowItems.length > 0 && (
-              <span style={{ color: "#df473c", fontWeight: 600, marginLeft: 8 }}>
-                · {lowItems.length} low stock
-              </span>
-            )}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button
-            className="btn btn-secondary"
-            onClick={handleReorderAll}
-            disabled={lowItems.length === 0}
-            style={{
-              background: "#fff", border: "1px solid #e2e8f0", color: "#64748b",
-              borderRadius: 20, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer"
-            }}
-          >
-            Reorder All
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => { setEditing(null); setShowForm(true); }}
-            style={{
-              background: "#0f172a", border: "none", color: "#fff",
-              borderRadius: 20, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer"
-            }}
-          >
-            + New Item
-          </button>
-        </div>
-      </div>
-
-      {showForm && (
-        <InventoryForm initial={editing} onClose={() => setShowForm(false)} onSaved={refetch} />
-      )}
-
-      {/* Stock level filter pills */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            onClick={() => setActiveFilter(f)}
-            style={{
-              background: activeFilter === f ? "#0f172a" : "#fff",
-              color: activeFilter === f ? "#fff" : "#334155",
-              border: "1px solid #e2e8f0",
-              borderRadius: 16, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer"
-            }}
-          >
-            {f}
-          </button>
-        ))}
-      </div>
-
-      <div className="card" style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
-        {loading && <div className="spinner" style={{ padding: 24, textAlign: "center" }}>Loading...</div>}
-        {!loading && (
-          <div className="table-wrap">
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <th style={{ padding: "16px 20px", color: "#94a3b8", fontWeight: 500, fontSize: "13px" }}>Item</th>
-                  <th style={{ padding: "16px 20px" }}></th>
-                  <th style={{ padding: "16px 20px", color: "#94a3b8", fontWeight: 500, fontSize: "13px" }}>Qty</th>
-                  <th style={{ padding: "16px 20px", color: "#94a3b8", fontWeight: 500, fontSize: "13px" }}>Max</th>
-                  <th style={{ padding: "16px 20px", color: "#94a3b8", fontWeight: 500, fontSize: "13px" }}>Reorder</th>
-                  <th style={{ padding: "16px 20px", color: "#94a3b8", fontWeight: 500, fontSize: "13px" }}>Level</th>
-                  <th style={{ padding: "16px 20px", color: "#94a3b8", fontWeight: 500, fontSize: "13px" }}>Category</th>
-                  <th style={{ padding: "16px 20px" }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((item) => {
-                  const stock = item.inv_stock ?? 0;
-                  const reorderTrigger = item.inv_rt ?? 0;
-                  
-                  // Safe mapping logic for items that might be missing certain fields
-                  const maxVal = item.inv_max ?? (reorderTrigger * 2 || 10); 
-                  const maxCapacityForBar = Math.max(maxVal, stock, 1);
-                  const pct = (stock / maxCapacityForBar) * 100;
-                  
-                  const critical = isCritical(item);
-                  const low = isLow(item);
-
-                  return (
-                    <tr key={item.inv_id} style={{ borderBottom: "1px solid #f8fafc" }}>
-                      {/* Ingredient Name */}
-                      <td style={{ padding: "16px 20px", fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap" }}>
-                        {item.inv_ing_name || "Unnamed Item"}
-                      </td>
-
-                      {/* Bar indicator */}
-                      <td style={{ padding: "16px 20px" }}>
-                        <div style={{ width: 120, height: 8, background: "#f1f5f9", borderRadius: 4, overflow: "hidden" }}>
-                          <div
-                            style={{ 
-                              width: `${Math.min(pct, 100)}%`, 
-                              height: "100%", 
-                              background: critical ? "#df473c" : "#0f172a",
-                              borderRadius: 4 
-                            }}
-                          />
-                        </div>
-                      </td>
-
-                      {/* Qty field */}
-                      <td style={{ padding: "16px 20px", fontWeight: 700, color: "#0f172a" }}>
-                        {stock} {item.inv_uom || "units"}
-                      </td>
-
-                      {/* Max threshold */}
-                      <td style={{ padding: "16px 20px", color: "#94a3b8" }}>
-                        {maxVal}
-                      </td>
-
-                      {/* Reorder threshold */}
-                      <td style={{ padding: "16px 20px", color: "#94a3b8" }}>
-                        {reorderTrigger}
-                      </td>
-
-                      {/* Level Status pill */}
-                      <td style={{ padding: "16px 20px" }}>
-                        {critical ? (
-                          <span style={{
-                            background: "#fef2f2", color: "#991b1b",
-                            padding: "4px 12px", borderRadius: 16, fontSize: 12, fontWeight: 600,
-                            display: "inline-flex", alignItems: "center", gap: 6
-                          }}>
-                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444" }} />
-                            Critical
-                          </span>
-                        ) : low ? (
-                          <span style={{
-                            background: "#fffbeb", color: "#b45309",
-                            padding: "4px 12px", borderRadius: 16, fontSize: 12, fontWeight: 600,
-                            display: "inline-flex", alignItems: "center", gap: 6
-                          }}>
-                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#f59e0b" }} />
-                            Low
-                          </span>
-                        ) : (
-                          <span style={{
-                            background: "#f0fdf4", color: "#16a34a",
-                            padding: "4px 12px", borderRadius: 16, fontSize: 12, fontWeight: 600,
-                            display: "inline-flex", alignItems: "center", gap: 6
-                          }}>
-                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} />
-                            OK
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Category field */}
-                      <td style={{ padding: "16px 20px", color: "#94a3b8", fontSize: 13 }}>
-                        {item.inv_category ?? "Ingredients"}
-                      </td>
-
-                      {/* Actions */}
-                      <td style={{ padding: "16px 20px" }}>
-                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                          <button
-                            onClick={() => { setEditing(item); setShowForm(true); }}
-                            style={{
-                              background: "#f1f5f9", border: "none", color: "#64748b",
-                              borderRadius: 6, padding: "6px 10px", fontSize: 13, cursor: "pointer",
-                            }}
-                          >
-                            ✎
-                          </button>
-                          <button
-                            onClick={() => handleReorder(item.inv_id)}
-                            style={{
-                              background: "#fee2e2", border: "none", color: "#ef4444",
-                              borderRadius: 6, padding: "6px 10px", fontSize: 13, cursor: "pointer",
-                            }}
-                          >
-                            ↺
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+function convertUnit(value: number, from: UnitType, to: UnitType): number {
+  if (from === to) return value;
+  if (DIMENSION[from] !== DIMENSION[to]) return value; // incompatible — show raw
+  // Convert from → base → to
+  const baseValue = value * TO_BASE[from];
+  return baseValue / TO_BASE[to];
 }
 
-// ─── Inventory Form Modal ─────────────────────────────────────────────────────
-
+// ─── Inventory Form ────────────────────────────────────────────────────────────
 function InventoryForm({
-  initial, onClose, onSaved,
+  initial,
+  onClose,
+  onSaved,
 }: {
   initial: InventoryItem | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [form, setForm] = useState({
-    inv_ing_name: initial?.inv_ing_name ?? "",
-    inv_stock:    initial?.inv_stock    ?? 0,
-    inv_uom:      (initial?.inv_uom     ?? "pcs") as UnitType,
-    inv_rt:       initial?.inv_rt       ?? 0,
-    inv_max:      initial?.inv_max      ?? 10,
-    inv_category: initial?.inv_category ?? "Ingredients"
-  });
+  const isEditing = initial !== null;
+  const [name, setName] = useState(initial?.inv_ing_name ?? "");
+  const [stock, setStock] = useState<number>(initial?.inv_stock ?? 0);
+  const [uom, setUom] = useState<UnitType>((initial?.inv_uom as UnitType) ?? "pcs");
+  const [rt, setRt] = useState<number>(initial?.inv_rt ?? 0);
+  const [adjustAmount, setAdjustAmount] = useState<number>(0);
   const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState("");
 
   const handleSave = async () => {
-    if (!form.inv_ing_name || form.inv_ing_name.length < 3) {
-      setErr("Ingredient name must be at least 3 characters."); return;
-    }
     setSaving(true);
     try {
-      if (initial) {
-        await inventoryApi.update(initial.inv_id, form);
+      if (isEditing && initial) {
+        // Use /update/{inv_id} endpoint via inventoryApi — adjust stock if amount changed
+        if (adjustAmount !== 0) {
+          await inventoryApi.adjustStock(initial.inv_id, adjustAmount);
+        }
+        // Also update name / uom / rt using the update endpoint your groupmate added
+        // Mapped to PUT /inventory/{inv_id} (or /update/{inv_id} per your groupmate)
+        await (inventoryApi as any).update(initial.inv_id, {
+          inv_ing_name: name,
+          inv_uom: uom,
+          inv_rt: rt,
+        });
       } else {
-        await inventoryApi.create(form);
+        await inventoryApi.create({
+          inv_ing_name: name,
+          inv_stock: stock,
+          inv_uom: uom,
+          inv_rt: rt,
+        });
       }
       onSaved();
       onClose();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Save failed");
+    } catch (err: any) {
+      alert(err?.message ?? "Failed to save ingredient.");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div style={overlay}>
-      <div style={modal}>
-        <h3 style={{ marginBottom: 16, fontSize: 16, color: "#0f172a" }}>
-          {initial ? "Edit Ingredient" : "New Ingredient"}
-        </h3>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div>
-            <label style={{ display: "block", fontSize: 12, marginBottom: 4, color: "#64748b" }}>Ingredient Name</label>
+    <div style={modalOverlayStyle}>
+      <div style={modalStyle}>
+        <div style={modalHeaderStyle}>
+          <h2 style={modalTitleStyle}>{isEditing ? "Edit Ingredient" : "New Ingredient"}</h2>
+          <button style={modalCloseBtnStyle} onClick={onClose}>✕</button>
+        </div>
+
+        <div style={fieldGroupStyle}>
+          <label style={labelStyle}>Ingredient Name</label>
+          <input
+            style={inputStyle}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Flour"
+          />
+        </div>
+
+        {!isEditing && (
+          <div style={fieldGroupStyle}>
+            <label style={labelStyle}>Initial Stock</label>
             <input
-              style={{ width: "100%", padding: "8px", border: "1px solid #e2e8f0", borderRadius: 6 }}
-              value={form.inv_ing_name}
-              onChange={(e) => setForm({ ...form, inv_ing_name: e.target.value })}
+              style={inputStyle}
+              type="number"
+              value={stock}
+              min={0}
+              onChange={(e) => setStock(Number(e.target.value))}
             />
           </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: "block", fontSize: 12, marginBottom: 4, color: "#64748b" }}>Current Stock</label>
-              <input
-                style={{ width: "100%", padding: "8px", border: "1px solid #e2e8f0", borderRadius: 6 }}
-                type="number"
-                value={form.inv_stock}
-                onChange={(e) => setForm({ ...form, inv_stock: Number(e.target.value) })}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: "block", fontSize: 12, marginBottom: 4, color: "#64748b" }}>Unit</label>
-              <select
-                style={{ width: "100%", padding: "8px", border: "1px solid #e2e8f0", borderRadius: 6 }}
-                value={form.inv_uom}
-                onChange={(e) => setForm({ ...form, inv_uom: e.target.value as UnitType })}
-              >
-                {UOM_OPTIONS.map((u) => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-            </div>
+        )}
+
+        {isEditing && (
+          <div style={fieldGroupStyle}>
+            <label style={labelStyle}>Adjust Stock (+ to restock, − to deduct)</label>
+            <input
+              style={inputStyle}
+              type="number"
+              value={adjustAmount}
+              onChange={(e) => setAdjustAmount(Number(e.target.value))}
+              placeholder="0"
+            />
+            <p style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
+              Current stock: <strong style={{ color: "#FFFFFF" }}>{initial?.inv_stock ?? 0} {initial?.inv_uom}</strong>
+              {adjustAmount !== 0 && (
+                <> → New: <strong style={{ color: adjustAmount > 0 ? "#bbf7d0" : "#fca5a5" }}>
+                  {Math.max(0, (initial?.inv_stock ?? 0) + adjustAmount)} {uom}
+                </strong></>
+              )}
+            </p>
           </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: "block", fontSize: 12, marginBottom: 4, color: "#64748b" }}>Reorder Trigger</label>
-              <input
-                style={{ width: "100%", padding: "8px", border: "1px solid #e2e8f0", borderRadius: 6 }}
-                type="number"
-                value={form.inv_rt}
-                onChange={(e) => setForm({ ...form, inv_rt: Number(e.target.value) })}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: "block", fontSize: 12, marginBottom: 4, color: "#64748b" }}>Max Capacity</label>
-              <input
-                style={{ width: "100%", padding: "8px", border: "1px solid #e2e8f0", borderRadius: 6 }}
-                type="number"
-                value={form.inv_max}
-                onChange={(e) => setForm({ ...form, inv_max: Number(e.target.value) })}
-              />
-            </div>
+        )}
+
+        <div style={{ display: "flex", gap: "12px" }}>
+          <div style={{ ...fieldGroupStyle, flex: 1 }}>
+            <label style={labelStyle}>Unit of Measure</label>
+            <select
+              style={inputStyle}
+              value={uom}
+              onChange={(e) => setUom(e.target.value as UnitType)}
+            >
+              {UOM_OPTIONS.map((u) => (
+                <option key={u} value={u} style={{ background: "#141210", color: "#fff" }}>{u}</option>
+              ))}
+            </select>
           </div>
-          {err && <p style={{ color: "#ef4444", fontSize: 12, margin: 0 }}>{err}</p>}
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-            <button style={{ background: "#fff", border: "1px solid #e2e8f0", padding: "6px 12px", borderRadius: 6, cursor: "pointer" }} onClick={onClose}>Cancel</button>
-            <button style={{ background: "#0f172a", color: "#fff", border: "none", padding: "6px 12px", borderRadius: 6, cursor: "pointer" }} onClick={handleSave} disabled={saving}>
-              {saving ? "Saving…" : "Save"}
-            </button>
+          <div style={{ ...fieldGroupStyle, flex: 1 }}>
+            <label style={labelStyle}>Reorder Trigger Level</label>
+            <input
+              style={inputStyle}
+              type="number"
+              value={rt}
+              min={0}
+              onChange={(e) => setRt(Number(e.target.value))}
+            />
           </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "8px" }}>
+          <button style={cancelBtnStyle} onClick={onClose} disabled={saving}>Cancel</button>
+          <button style={saveBtnStyle} onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : isEditing ? "Save Changes" : "Add Ingredient"}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-const overlay: React.CSSProperties = {
-  position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
-  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200,
-};
-const modal: React.CSSProperties = {
-  background: "#fff", borderRadius: 14, padding: 24, width: "100%", maxWidth: 420,
-};
+// ─── Main Page ─────────────────────────────────────────────────────────────────
+export default function InventoryPage() {
+  const { data: items, loading, refetch } = useFetch<InventoryItem[]>(inventoryApi.list);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<InventoryItem | null>(null);
+  const [activeFilter, setActiveFilter] = useState("All");
+  const [displayUnits, setDisplayUnits] = useState<Record<number, UnitType>>({});
+
+  const isLow = (item: InventoryItem) => (item.inv_stock ?? 0) <= (item.inv_rt ?? 0);
+  const isCritical = (item: InventoryItem) => (item.inv_stock ?? 0) <= (item.inv_rt ?? 0) * 0.5;
+
+  const allItems = items ?? [];
+
+  const filtered = allItems.filter((item) => {
+    if (activeFilter === "All") return true;
+    if (activeFilter === "Critical") return isCritical(item);
+    if (activeFilter === "Low") return isLow(item) && !isCritical(item);
+    if (activeFilter === "OK") return !isLow(item);
+    return true;
+  });
+
+  const lowItems = allItems.filter(isLow);
+
+  return (
+    <div style={containerStyle}>
+      <div style={backgroundWrapperStyle} />
+      <div style={luxuryScrimOverlayStyle} />
+
+      <div style={contentWrapperStyle}>
+        <div style={headerContainerStyle}>
+          <div>
+            <h1 style={titleStyle}>Bakery Inventory</h1>
+            <p style={subtitleStyle}>
+              {allItems.length} active ingredients listed
+              {lowItems.length > 0 && (
+                <span style={{ color: "#fca5a5", fontWeight: 700, marginLeft: "8px" }}>
+                  · {lowItems.length} require restocking
+                </span>
+              )}
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <button
+              style={primaryBtnStyle}
+              onClick={() => { setEditing(null); setShowForm(true); }}
+            >
+              + New Ingredient
+            </button>
+          </div>
+        </div>
+
+        <main style={mainGlassPanelStyle}>
+          <div style={panelHeaderStyle}>
+            <h2 style={panelTitleStyle}>Stock Streams</h2>
+            <div style={filterBarStyle}>
+              {FILTERS.map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setActiveFilter(f)}
+                  style={activeFilter === f ? activeFilterBtnStyle : inactiveFilterBtnStyle}
+                >
+                  {f} Stocks
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loading && <div style={statusMessageStyle}>Auditing ingredient tracking logs...</div>}
+
+          {!loading && (
+            <div style={{ overflowX: "auto" }}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr style={tableHeaderRowStyle}>
+                    <th style={thStyle}>Ingredient Name</th>
+                    <th style={thStyle}>Stock Level</th>
+                    <th style={thStyle}>Display Qty</th>
+                    <th style={thStyle}>Reorder Trigger</th>
+                    <th style={thStyle}>Status</th>
+                    <th style={{ ...thStyle, textAlign: "right" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((item) => {
+                    const stock = item.inv_stock ?? 0;
+                    const reorderTrigger = item.inv_rt ?? 0;
+                    const maxVal = (item as any).inv_max ?? (reorderTrigger * 2 || 10);
+                    const pct = (stock / Math.max(maxVal, stock, 1)) * 100;
+
+                    const storedUnit = (item.inv_uom as UnitType) || "pcs";
+                    const currentUnit = displayUnits[item.inv_id] || storedUnit;
+                    const convertedQty = convertUnit(stock, storedUnit, currentUnit);
+
+                    return (
+                      <tr key={item.inv_id} style={tableRowStyle}>
+                        <td style={{ ...tdStyle, fontWeight: 700, color: "#C8883A" }}>
+                          {item.inv_ing_name || "Unnamed Item"}
+                        </td>
+
+                        <td style={tdStyle}>
+                          <div style={{ width: "110px", height: "6px", backgroundColor: "rgba(255,255,255,0.1)", borderRadius: "10px", overflow: "hidden" }}>
+                            <div style={{
+                              width: `${Math.min(pct, 100)}%`,
+                              height: "100%",
+                              backgroundColor: isCritical(item) ? "#fca5a5" : isLow(item) ? "#fde68a" : "#bbf7d0",
+                              transition: "width 0.4s ease"
+                            }} />
+                          </div>
+                        </td>
+
+                        <td style={tdStyle}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ fontWeight: 700, color: "#FFFFFF", minWidth: "50px" }}>
+                              {convertedQty % 1 === 0 ? convertedQty : convertedQty.toFixed(2)}
+                            </span>
+                            <select
+                              value={currentUnit}
+                              onChange={(e) =>
+                                setDisplayUnits({ ...displayUnits, [item.inv_id]: e.target.value as UnitType })
+                              }
+                              style={tableSelectStyle}
+                            >
+                              {UOM_OPTIONS.map((u) => (
+                                <option key={u} value={u} style={{ background: "#141210", color: "#fff" }}>{u}</option>
+                              ))}
+                            </select>
+                            {currentUnit !== storedUnit && (
+                              <span style={{ fontSize: "10px", color: "#64748b" }}>
+                                (stored: {stock} {storedUnit})
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td style={{ ...tdStyle, color: "#cbd5e1" }}>{reorderTrigger} {storedUnit}</td>
+
+                        <td style={tdStyle}>
+                          <span style={{
+                            backgroundColor: isCritical(item) ? "rgba(254,226,226,0.12)" : isLow(item) ? "rgba(254,243,199,0.15)" : "rgba(220,252,231,0.12)",
+                            color: isCritical(item) ? "#fecaca" : isLow(item) ? "#fde68a" : "#bbf7d0",
+                            padding: "3px 8px",
+                            borderRadius: "30px",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.5px",
+                            border: `1px solid ${isCritical(item) ? "#fecaca" : isLow(item) ? "#fde68a" : "#bbf7d0"}22`
+                          }}>
+                            {isCritical(item) ? "Critical" : isLow(item) ? "Low" : "OK"}
+                          </span>
+                        </td>
+
+                        <td style={{ ...tdStyle, textAlign: "right" }}>
+                          <button
+                            onClick={() => { setEditing(item); setShowForm(true); }}
+                            style={editActionBtnStyle}
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ ...tdStyle, textAlign: "center", color: "#64748b", fontStyle: "italic", padding: "32px" }}>
+                        No ingredients match this filter.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {showForm && (
+        <InventoryForm
+          initial={editing}
+          onClose={() => setShowForm(false)}
+          onSaved={refetch}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const containerStyle: React.CSSProperties = { position: "relative", minHeight: "calc(100vh - var(--navbar-h, 60px))", overflowY: "auto", padding: "24px 32px", backgroundColor: "#080605", fontFamily: "system-ui, -apple-system, sans-serif", color: "#FFFFFF" };
+const backgroundWrapperStyle: React.CSSProperties = { position: "fixed", top: "var(--navbar-h, 60px)", left: 0, right: 0, bottom: 0, backgroundImage: "url('/Inventory-bg.png')", backgroundSize: "cover", backgroundPosition: "center", opacity: 1.0, zIndex: 0, pointerEvents: "none" };
+const luxuryScrimOverlayStyle: React.CSSProperties = { position: "fixed", top: "var(--navbar-h, 60px)", left: 0, right: 0, bottom: 0, backgroundColor: "rgba(8, 6, 5, 0.7)", zIndex: 1, pointerEvents: "none" };
+const contentWrapperStyle: React.CSSProperties = { position: "relative", zIndex: 2, maxWidth: "1340px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "20px" };
+const headerContainerStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" };
+const titleStyle: React.CSSProperties = { margin: 0, fontSize: "26px", fontWeight: "normal", fontFamily: "Georgia, serif", color: "#FFFFFF" };
+const subtitleStyle: React.CSSProperties = { margin: "2px 0 0 0", fontSize: "12px", color: "#64748b" };
+const primaryBtnStyle: React.CSSProperties = { backgroundColor: "#C8883A", color: "#FFFFFF", padding: "8px 16px", borderRadius: "4px", fontWeight: 600, fontSize: "12px", border: "none", cursor: "pointer", boxShadow: "0 4px 12px rgba(200,136,58,0.15)" };
+const mainGlassPanelStyle: React.CSSProperties = { backgroundColor: "rgba(20,18,16,0.82)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "6px", padding: "20px 24px", boxShadow: "0 15px 30px rgba(0,0,0,0.3)" };
+const panelHeaderStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.05)", paddingBottom: "12px" };
+const panelTitleStyle: React.CSSProperties = { margin: 0, fontSize: "16px", fontWeight: "normal", fontFamily: "Georgia, serif", color: "#FFFFFF" };
+const filterBarStyle: React.CSSProperties = { display: "flex", gap: "4px", flexWrap: "wrap" };
+const activeFilterBtnStyle: React.CSSProperties = { backgroundColor: "rgba(200,136,58,0.12)", color: "#C8883A", border: "1px solid rgba(200,136,58,0.4)", padding: "4px 10px", borderRadius: "3px", fontSize: "11px", fontWeight: 600, cursor: "pointer" };
+const inactiveFilterBtnStyle: React.CSSProperties = { backgroundColor: "transparent", color: "#64748b", border: "1px solid transparent", padding: "4px 10px", borderRadius: "3px", fontSize: "11px", fontWeight: 500, cursor: "pointer" };
+const tableStyle: React.CSSProperties = { width: "100%", borderCollapse: "collapse", textAlign: "left" };
+const tableHeaderRowStyle: React.CSSProperties = { borderBottom: "1px solid rgba(255,255,255,0.08)" };
+const thStyle: React.CSSProperties = { padding: "10px 12px", fontSize: "10px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" };
+const tableRowStyle: React.CSSProperties = { borderBottom: "1px solid rgba(255,255,255,0.03)" };
+const tdStyle: React.CSSProperties = { padding: "12px", fontSize: "13px", color: "#cbd5e1" };
+const tableSelectStyle: React.CSSProperties = { border: "1px solid rgba(255,255,255,0.15)", borderRadius: "3px", padding: "2px 4px", fontSize: "11px", backgroundColor: "rgba(20,18,16,0.9)", outline: "none", color: "#94a3b8", cursor: "pointer" };
+const editActionBtnStyle: React.CSSProperties = { backgroundColor: "transparent", color: "#FFFFFF", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "3px", padding: "4px 10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" };
+const statusMessageStyle: React.CSSProperties = { textAlign: "center", padding: "24px", fontSize: "13px", color: "#64748b" };
+
+// Modal styles
+const modalOverlayStyle: React.CSSProperties = { position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" };
+const modalStyle: React.CSSProperties = { backgroundColor: "#141210", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "28px", width: "100%", maxWidth: "480px", display: "flex", flexDirection: "column", gap: "16px", boxShadow: "0 25px 50px rgba(0,0,0,0.6)" };
+const modalHeaderStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center" };
+const modalTitleStyle: React.CSSProperties = { margin: 0, fontSize: "18px", fontWeight: "normal", fontFamily: "Georgia, serif", color: "#FFFFFF" };
+const modalCloseBtnStyle: React.CSSProperties = { background: "none", border: "none", color: "#64748b", fontSize: "16px", cursor: "pointer", padding: "4px" };
+const fieldGroupStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: "6px" };
+const labelStyle: React.CSSProperties = { fontSize: "10px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" };
+const inputStyle: React.CSSProperties = { padding: "9px 12px", borderRadius: "4px", border: "1px solid rgba(255,255,255,0.1)", backgroundColor: "rgba(8,6,5,0.8)", fontSize: "13px", color: "#FFFFFF", outline: "none", width: "100%", boxSizing: "border-box" };
+const cancelBtnStyle: React.CSSProperties = { backgroundColor: "transparent", color: "#94a3b8", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "4px", padding: "8px 16px", fontSize: "13px", cursor: "pointer" };
+const saveBtnStyle: React.CSSProperties = { backgroundColor: "#C8883A", color: "#FFFFFF", border: "none", borderRadius: "4px", padding: "8px 20px", fontSize: "13px", fontWeight: 600, cursor: "pointer" };
