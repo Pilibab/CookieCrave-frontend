@@ -34,11 +34,9 @@ function BOMForm({
     try {
       await bomApi.create({
         prod_id: productId,
-        inv_id: Number(selectedInvId),
-        bom_quan_req: quantityReq,
+        ingredients: [{ inv_id: Number(selectedInvId), bom_quan_req: quantityReq }],
       });
       onSaved();
-      // Reset for adding another
       setSelectedInvId("");
       setQuantityReq(0);
     } catch (err: any) {
@@ -77,7 +75,6 @@ function BOMForm({
           <button style={modalCloseBtnStyle} onClick={onClose}>✕</button>
         </div>
 
-        {/* Existing entries */}
         {existingEntries.length > 0 && (
           <div style={{ marginBottom: "8px" }}>
             <p style={sectionLabelStyle}>Current ingredients</p>
@@ -107,7 +104,6 @@ function BOMForm({
 
         <p style={sectionLabelStyle}>Add ingredient</p>
 
-        {/* Ingredient dropdown */}
         <div style={fieldGroupStyle}>
           <label style={labelStyle}>Ingredient</label>
           <select
@@ -133,7 +129,6 @@ function BOMForm({
           </select>
         </div>
 
-        {/* Quantity + Unit (auto from inventory) */}
         <div style={{ display: "flex", gap: "12px" }}>
           <div style={{ ...fieldGroupStyle, flex: 2 }}>
             <label style={labelStyle}>Quantity required</label>
@@ -215,8 +210,6 @@ function ProductForm({
         setUploadProgress("uploading");
         try {
           // TODO: Replace with actual Supabase upload logic
-          // const { data, error } = await supabase.storage.from('products').upload(...)
-          // uploadedImageUrl = supabase.storage.from('products').getPublicUrl(...).data.publicUrl
           setUploadProgress("done");
         } catch (uploadErr: any) {
           setUploadProgress("error");
@@ -231,7 +224,6 @@ function ProductForm({
         prod_price: price,
         prod_desc: desc,
         prod_sl: sl,
-        // prod_available is NOT sent — backend auto-computes it on GET /products
         ...(uploadedImageUrl ? { prod_image_url: uploadedImageUrl } : {}),
       };
 
@@ -320,15 +312,14 @@ function ProductForm({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ProductsPage() {
-  // productsApi.list hits GET /products which auto-recomputes prod_available on the backend
   const { data: products, loading: loadingProducts, refetch } = useFetch<Product[]>(productsApi.list);
   const { data: allBom,   loading: loadingBom,   refetch: refetchBom } = useFetch<BOMEntry[]>(bomApi.list);
   const { data: inventory, loading: loadingInv }                        = useFetch<InventoryItem[]>(inventoryApi.list);
 
   const loading = loadingProducts || loadingBom || loadingInv;
 
-  const [showForm, setShowForm]   = useState(false);
-  const [editing, setEditing]     = useState<Product | null>(null);
+  const [showForm, setShowForm]     = useState(false);
+  const [editing, setEditing]       = useState<Product | null>(null);
   const [bomProduct, setBomProduct] = useState<Product | null>(null);
 
   const inventoryMap = new Map<number, InventoryItem>(
@@ -337,7 +328,6 @@ export default function ProductsPage() {
 
   const handleBomSaved = () => {
     refetchBom();
-    // Refetch products so prod_available badge reflects latest BOM change
     refetch();
   };
 
@@ -348,7 +338,6 @@ export default function ProductsPage() {
 
       <div style={contentWrapperStyle}>
 
-        {/* Header */}
         <div style={headerContainerStyle}>
           <div>
             <h1 style={titleStyle}>Cookie Catalog</h1>
@@ -366,16 +355,13 @@ export default function ProductsPage() {
         {!loading && (
           <div style={gridStyle}>
             {(products ?? []).map((product) => {
-              const productId = product.prod_id ?? (product as any).id;
+              const productId  = product.prod_id ?? (product as any).id;
               const bomEntries = (allBom ?? []).filter((b) => b.prod_id === productId);
+              const available  = product.prod_available ?? false;
 
-              // Use backend-computed prod_available as source of truth
-              const available = product.prod_available ?? false;
-
-              // Still show per-ingredient breakdown from frontend for detail view
               const missingIngredients: string[] = [];
               for (const entry of bomEntries) {
-                const invItem = inventoryMap.get(entry.inv_id);
+                const invItem  = inventoryMap.get(entry.inv_id);
                 const required = entry.bom_quan_req ?? 0;
                 if (!invItem || (invItem.inv_stock ?? 0) < required) {
                   missingIngredients.push(
@@ -389,7 +375,6 @@ export default function ProductsPage() {
               return (
                 <div key={productId} style={cardStyle}>
 
-                  {/* Top row */}
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
                     <span style={productIdStyle}>ID: {productId}</span>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -425,13 +410,12 @@ export default function ProductsPage() {
                     <p style={shelfLifeStyle}>Shelf life: {product.prod_sl}</p>
                   )}
 
-                  {/* Ingredient breakdown */}
                   {bomEntries.length > 0 && (
                     <div style={ingredientsSection}>
                       <p style={ingredientsTitleStyle}>Ingredients required:</p>
                       <ul style={ingredientsListStyle}>
                         {bomEntries.map((entry) => {
-                          const invItem = inventoryMap.get(entry.inv_id);
+                          const invItem  = inventoryMap.get(entry.inv_id);
                           const required = entry.bom_quan_req ?? 0;
                           const hasStock = invItem && (invItem.inv_stock ?? 0) >= required;
                           return (
@@ -460,7 +444,6 @@ export default function ProductsPage() {
                     <div style={noBomStyle}>No BOM configured — click BOM to add ingredients.</div>
                   )}
 
-                  {/* Bottom availability bar */}
                   <div style={{
                     ...availabilityBarStyle,
                     backgroundColor: available ? "rgba(187,247,208,0.08)" : "rgba(252,165,165,0.08)",
@@ -541,8 +524,6 @@ const emptyStateStyle: React.CSSProperties = { padding: "40px", textAlign: "cent
 const sectionLabelStyle: React.CSSProperties = { fontSize: "10px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 8px 0" };
 const bomRowStyle: React.CSSProperties = { display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", backgroundColor: "rgba(255,255,255,0.03)", borderRadius: "4px", border: "1px solid rgba(255,255,255,0.06)" };
 const deleteBtnStyle: React.CSSProperties = { marginLeft: "auto", background: "none", border: "none", color: "#64748b", fontSize: "12px", cursor: "pointer", padding: "2px 6px" };
-
-// Modal styles
 const modalOverlayStyle: React.CSSProperties = { position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" };
 const modalStyle: React.CSSProperties = { backgroundColor: "#141210", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "28px", width: "100%", maxWidth: "480px", display: "flex", flexDirection: "column", gap: "16px", boxShadow: "0 25px 50px rgba(0,0,0,0.6)", maxHeight: "90vh", overflowY: "auto" };
 const modalHeaderStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center" };

@@ -15,7 +15,6 @@ const STATUS_OPTIONS: OrderStatus[] = [
   "Cancelled",
 ];
 
-// Statuses that require BOM validation before proceeding
 const STATUSES_REQUIRING_BOM: OrderStatus[] = [
   "Confirmed",
   "Baking",
@@ -42,9 +41,6 @@ export default function OrdersPage() {
   const [deductError, setDeductError]     = useState<Record<number, string>>({});
   const [validationError, setValidationError] = useState<Record<number, string>>({});
 
-  // ─── BOM validation ────────────────────────────────────────────────────────
-  // Fetches BOM for each product in the order.
-  // Returns list of product IDs that have NO BOM configured.
   const validateBOM = async (order: Order): Promise<number[]> => {
     const productIds: number[] = Array.isArray((order as any).prod_ids)
       ? (order as any).prod_ids
@@ -62,7 +58,6 @@ export default function OrdersPage() {
             missingBOM.push(prodId);
           }
         } catch {
-          // If fetch fails, treat as missing BOM to be safe
           missingBOM.push(prodId);
         }
       })
@@ -71,7 +66,6 @@ export default function OrdersPage() {
     return missingBOM;
   };
 
-  // ─── Status change handler ─────────────────────────────────────────────────
   const handleStatusChange = async (
     orderId: number,
     currentOrder: Order,
@@ -79,14 +73,12 @@ export default function OrdersPage() {
   ) => {
     if (updatingId === orderId) return;
 
-    // Clear previous errors for this order
     setValidationError((prev) => ({ ...prev, [orderId]: "" }));
     setDeductError((prev) => ({ ...prev, [orderId]: "" }));
 
     try {
       setUpdatingId(orderId);
 
-      // 1. BOM validation — block progress if any product is missing a BOM
       if (STATUSES_REQUIRING_BOM.includes(nextStatus)) {
         const missingBOM = await validateBOM(currentOrder);
         if (missingBOM.length > 0) {
@@ -98,10 +90,8 @@ export default function OrdersPage() {
         }
       }
 
-      // 2. Update order status
       await ordersApi.update(orderId, { ...currentOrder, order_status: nextStatus });
 
-      // 3. On Completed — single backend call handles BOM lookup + stock deduction
       if (nextStatus === "Completed" && currentOrder.order_status !== "Completed") {
         try {
           await inventoryApi.deductByOrder(orderId);
@@ -123,7 +113,7 @@ export default function OrdersPage() {
     }
   };
 
-  const statusStyle = (status: string) => {
+  const statusStyle = (status: string): React.CSSProperties => {
     const c = STATUS_COLORS[status] ?? STATUS_COLORS["Pending"];
     return {
       backgroundColor: c.bg,
@@ -132,8 +122,8 @@ export default function OrdersPage() {
       padding: "3px 8px",
       borderRadius: "3px",
       fontSize: "10px",
-      fontWeight: 700 as const,
-      textTransform: "uppercase" as const,
+      fontWeight: 700,
+      textTransform: "uppercase",
       letterSpacing: "0.5px",
       display: "inline-block",
     };
@@ -145,7 +135,6 @@ export default function OrdersPage() {
       <div style={luxuryScrimOverlayStyle} />
 
       <div style={contentWrapperStyle}>
-        {/* Header */}
         <div style={headerContainerStyle}>
           <div>
             <h1 style={titleStyle}>Fulfillment Console</h1>
@@ -184,45 +173,36 @@ export default function OrdersPage() {
                     return (
                       <tr key={orderId} style={tableRowStyle}>
 
-                        {/* Order ID */}
                         <td style={{ ...tdStyle, fontWeight: 700, color: "#C8883A" }}>
                           #{orderId}
                         </td>
 
-                        {/* Customer */}
                         <td style={{ ...tdStyle, color: "#FFFFFF" }}>
                           {ord.cust_id ?? "—"}
                         </td>
 
-                        {/* Amount */}
                         <td style={{ ...tdStyle, color: "#FFFFFF" }}>
                           ₱{(ord.total_amount ?? 0).toLocaleString()}
                         </td>
 
-                        {/* Fulfillment type — comes from fulfillment_id join on backend */}
                         <td style={{ ...tdStyle, color: "#94a3b8", fontSize: "12px" }}>
                           {(ord as any).ord_f_type ?? "—"}
                         </td>
 
-                        {/* Status badge */}
                         <td style={tdStyle}>
                           <span style={statusStyle(ord.order_status ?? "Pending")}>
                             {ord.order_status ?? "Pending"}
                           </span>
                         </td>
 
-                        {/* Inventory / BOM status column */}
                         <td style={{ ...tdStyle, fontSize: "11px", maxWidth: "280px" }}>
                           {isUpdating ? (
                             <span style={{ color: "#64748b" }}>Validating…</span>
                           ) : bomErr ? (
-                            // BOM validation failed — no BOM configured for a product
                             <span style={{ color: "#fde68a" }}>⚠ {bomErr}</span>
                           ) : deductErr ? (
-                            // BOM was valid but deduction failed
                             <span style={{ color: "#fca5a5" }}>✗ {deductErr}</span>
                           ) : log ? (
-                            // Deduction succeeded
                             <span style={{ color: "#bbf7d0" }}>✓ {log}</span>
                           ) : ord.order_status === "Completed" ? (
                             <span style={{ color: "#64748b", fontStyle: "italic" }}>deducted</span>
@@ -231,7 +211,6 @@ export default function OrdersPage() {
                           )}
                         </td>
 
-                        {/* Status dropdown */}
                         <td style={{ ...tdStyle, textAlign: "right" }}>
                           <select
                             style={{
@@ -241,13 +220,9 @@ export default function OrdersPage() {
                             }}
                             value={ord.order_status ?? "Pending"}
                             disabled={isUpdating}
-<<<<<<< Updated upstream
-                            onChange={(e) => handleStatusChange(orderId, ord, e.target.value as OrderStatus)}
-=======
                             onChange={(e) =>
                               handleStatusChange(orderId, ord, e.target.value as OrderStatus)
                             }
->>>>>>> Stashed changes
                           >
                             {STATUS_OPTIONS.map((s) => (
                               <option
