@@ -1,103 +1,153 @@
 "use client";
 
 import { useState } from "react";
-import { useFetch, useMutation } from "@/hooks/useFetch";
-import { productsApi } from "@/lib/api";
-import type { Product } from "@/types/mytypes";
+import { useFetch } from "@/hooks/useFetch";
+import { customersApi } from "@/lib/api";
+import type { Customer } from "@/types";
 
-export default function ProductsPage() {
-  const { data: products, loading, refetch } = useFetch(productsApi.list);
+export default function CustomersPage() {
+  const [page, setPage] = useState(1);
+  // Backend GET /customers returns List[Customer] (not paginated shape)
+  // Accept both shapes gracefully
+  const { data: raw, loading, refetch } = useFetch<Customer[] | { data: Customer[]; total: number }>(
+    () => customersApi.list(page, 20) as unknown as Promise<Customer[] | { data: Customer[]; total: number }>,
+    [page]
+  );
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Product | null>(null);
+  const [search, setSearch] = useState("");
+
+  const customers: Customer[] = Array.isArray(raw)
+    ? raw
+    : (raw as { data: Customer[] } | null)?.data ?? [];
+  const total: number = Array.isArray(raw)
+    ? raw.length
+    : (raw as { total: number } | null)?.total ?? 0;
+
+  const filtered = customers.filter((c) =>
+    !search ||
+    `${c.cust_firstname} ${c.cust_lastname}`.toLowerCase().includes(search.toLowerCase()) ||
+    c.cust_email.toLowerCase().includes(search.toLowerCase()) ||
+    (c.cust_cont_no ?? "").includes(search)
+  );
 
   return (
-    <div className="page-body">
+    <div>
       <div className="page-header">
-        <h1 className="page-title">Products</h1>
-        <button className="btn btn-primary" onClick={() => { setEditing(null); setShowForm(true); }}>
-          + Add Product
-        </button>
+        <div>
+          <h1 className="page-title" style={{ color: "var(--navy)" }}>Customers</h1>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+            {total} customers
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div className="search-bar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              placeholder="Search customers..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}>+ Add Customer</button>
+        </div>
       </div>
 
       {showForm && (
-        <ProductForm
-          initial={editing}
-          onClose={() => setShowForm(false)}
-          onSaved={refetch}
-        />
+        <CustomerForm onClose={() => setShowForm(false)} onSaved={refetch} />
       )}
 
       <div className="card">
         {loading && <div className="spinner" />}
         {!loading && (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Description</th>
-                  <th>Price</th>
-                  <th>Shelf Life</th>
-                  <th>Available</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {(products ?? []).map((p) => (
-                  <tr key={p.product_id}>
-                    <td style={{ color: "#6b6f8a" }}>#{p.product_id}</td>
-                    <td style={{ fontWeight: 600 }}>{p.product_name}</td>
-                    <td style={{ maxWidth: 220, fontSize: 13, color: "#6b6f8a" }}>{p.product_description ?? "—"}</td>
-                    <td style={{ fontWeight: 600, color: "#c8883a" }}>₱{Number(p.price).toFixed(2)}</td>
-                    <td>{p.shelf_life ?? "—"}</td>
-                    <td>
-                      <span className={`badge ${p.is_available ? "badge-completed" : "badge-cancelled"}`}>
-                        {p.is_available ? "Yes" : "No"}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ fontSize: 12, padding: "4px 10px" }}
-                        onClick={() => { setEditing(p); setShowForm(true); }}
-                      >
-                        Edit
-                      </button>
-                    </td>
+          <>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Customer ID</th>
+                    <th>Full Name</th>
+                    <th>Email Address</th>
+                    <th>Contact No.</th>
+                    <th>Provider</th>
+                    <th>Created Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filtered.map((c) => (
+                    <tr key={c.cust_id}>
+                      <td style={{ color: "var(--text-muted)", fontSize: 11, fontFamily: "monospace" }}>
+                        {String(c.cust_id).slice(0, 8)}…
+                      </td>
+                      <td style={{ fontWeight: 600 }}>
+                        {c.cust_lastname}, {c.cust_firstname}
+                        {c.cust_middlename ? ` ${c.cust_middlename[0]}.` : ""}
+                      </td>
+                      <td>{c.cust_email}</td>
+                      <td>{c.cust_cont_no || "—"}</td>
+                      <td style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                        {c.cust_social_provider ?? "—"}
+                      </td>
+                      <td style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                        {c.cust_cd && !isNaN(Date.parse(c.cust_cd))
+                          ? new Date(c.cust_cd).toLocaleDateString("en-PH")
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={6}>
+                        <div className="empty-state"><p>No customers found</p></div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {total > 20 && (
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+                <button className="btn btn-secondary" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>← Prev</button>
+                <span style={{ lineHeight: "36px", fontSize: 12, color: "var(--text-muted)" }}>Page {page}</span>
+                <button className="btn btn-secondary" disabled={page * 20 >= total} onClick={() => setPage((p) => p + 1)}>Next →</button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
   );
 }
 
-function ProductForm({
-  initial, onClose, onSaved,
-}: { initial: Product | null; onClose: () => void; onSaved: () => void }) {
+// ─── Customer Form Modal ──────────────────────────────────────────────────────
+// Matches backend CustomerCreate / CustomerBase field names exactly
+
+function CustomerForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
-    product_name: initial?.product_name ?? "",
-    product_description: initial?.product_description ?? "",
-    price: initial?.price ?? 0,
-    is_available: initial?.is_available ?? true,
-    shelf_life: initial?.shelf_life ?? "",
+    cust_firstname: "",
+    cust_lastname: "",
+    cust_middlename: "",
+    cust_email: "",
+    cust_cont_no: "",
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
   const handleSave = async () => {
-    if (!form.product_name || form.price < 0) { setErr("Name and valid price are required."); return; }
+    if (!form.cust_firstname || !form.cust_lastname || !form.cust_email) {
+      setErr("First name, last name, and email are required.");
+      return;
+    }
     setSaving(true);
     try {
-      if (initial) {
-        await productsApi.update(initial.product_id, form);
-      } else {
-        await productsApi.create(form);
-      }
+      await customersApi.create({
+        cust_firstname: form.cust_firstname,
+        cust_lastname: form.cust_lastname,
+        cust_middlename: form.cust_middlename || undefined,
+        cust_email: form.cust_email,
+        cust_cont_no: form.cust_cont_no || undefined,
+      });
       onSaved();
       onClose();
     } catch (e) {
@@ -107,36 +157,40 @@ function ProductForm({
     }
   };
 
+  const f = (key: keyof typeof form) => ({
+    className: "form-input",
+    value: form[key],
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: e.target.value }),
+  });
+
   return (
     <div style={overlay}>
       <div style={modal}>
-        <h3 style={{ marginBottom: 16 }}>{initial ? "Edit Product" : "New Product"}</h3>
+        <h3 style={{ marginBottom: 16, fontSize: 16, color: "var(--navy)" }}>New Customer</h3>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div className="form-group">
-            <label className="form-label">Product Name *</label>
-            <input className="form-input" value={form.product_name} onChange={(e) => setForm({ ...form, product_name: e.target.value })} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Description</label>
-            <textarea className="form-textarea" rows={3} value={form.product_description} onChange={(e) => setForm({ ...form, product_description: e.target.value })} />
-          </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Price (₱) *</label>
-              <input className="form-input" type="number" min={0} step={0.01} value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="form-group">
+              <label className="form-label">First Name *</label>
+              <input {...f("cust_firstname")} />
             </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Shelf Life</label>
-              <input className="form-input" value={form.shelf_life} onChange={(e) => setForm({ ...form, shelf_life: e.target.value })} placeholder="e.g. 3 days" />
+            <div className="form-group">
+              <label className="form-label">Last Name *</label>
+              <input {...f("cust_lastname")} />
             </div>
           </div>
           <div className="form-group">
-            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <input type="checkbox" checked={form.is_available} onChange={(e) => setForm({ ...form, is_available: e.target.checked })} />
-              <span className="form-label" style={{ margin: 0 }}>Available for ordering</span>
-            </label>
+            <label className="form-label">Middle Name</label>
+            <input {...f("cust_middlename")} />
           </div>
-          {err && <p style={{ color: "#c0392b", fontSize: 13 }}>{err}</p>}
+          <div className="form-group">
+            <label className="form-label">Email *</label>
+            <input {...f("cust_email")} type="email" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Contact Number</label>
+            <input {...f("cust_cont_no")} placeholder="09xxxxxxxxx (+63 format)" />
+          </div>
+          {err && <p style={{ color: "#c0392b", fontSize: 12 }}>{err}</p>}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
@@ -154,5 +208,5 @@ const overlay: React.CSSProperties = {
   display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200,
 };
 const modal: React.CSSProperties = {
-  background: "#fff", borderRadius: 12, padding: 28, width: "100%", maxWidth: 460,
+  background: "#fff", borderRadius: 14, padding: 28, width: "100%", maxWidth: 500,
 };

@@ -111,9 +111,9 @@ export const productsApi = {
   list: () => IS_MOCK
     ? getMock().mockProductsApi.list()
     : request<import("@/types/mytypes").Product[]>("/products"),
-  get: (id: number) => IS_MOCK
-    ? getMock().mockProductsApi.get(id)
-    : request<import("@/types/mytypes").Product>(`/products/${id}`),
+  get: (id: number) => 
+    // IS_MOCK ? getMock().mockProductsApi.get(id): 
+    request<import("@/types/mytypes").Product>(`/products/${id}`),
   create: (body: Partial<import("@/types/mytypes").Product>) => IS_MOCK
     ? getMock().mockProductsApi.create(body)
     : request<import("@/types/mytypes").Product>("/products", { method: "POST", body: JSON.stringify(body) }),
@@ -170,9 +170,7 @@ export const cartApi = {
   add: (body: { order_id: number; product_id: number; quantity: number }) => IS_MOCK
     ? getMock().mockCartApi.add(body)
     : request<import("@/types/mytypes").CartOrderLineItem>("/cart", { method: "POST", body: JSON.stringify(body) }),
-  getByOrder: (orderId: number) => IS_MOCK
-    ? getMock().mockCartApi.getByOrder(orderId)
-    : request<import("@/types/mytypes").CartOrderLineItem[]>(`/cart/order/${orderId}`),
+  getByOrder: (orderId: number) => request<import("@/types/mytypes").CartOrderLineItem[]>(`/cart/order/${orderId}`),
   removeItem: (orderId: number, productId: number) => IS_MOCK
     ? Promise.resolve()
     : request(`/cart/order/${orderId}/product/${productId}`, { method: "DELETE" }),

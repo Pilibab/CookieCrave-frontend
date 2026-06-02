@@ -9,26 +9,17 @@ export interface User {
 
 // ─── Customer ────────────────────────────────────────────────────────────────
 export interface Customer {
-  customer_id: string;
-  last_name: string;
-  given_name: string;
-  middle_name?: string;
-  suffix?: string;
-  email: string;
-  contact_num?: string;
-  created_at: string;
+  cust_id: string;               // UUID from Supabase auth
+  cust_firstname: string;
+  cust_lastname: string;
+  cust_middlename?: string | null;
+  cust_email: string;
+  cust_social_provider?: string | null;  // "google" | "facebook"
+  cust_cont_no?: string | null;
+  cust_cd: string;               // datetime ISO string (auto-set by DB)
 }
 
-// ─── Product ─────────────────────────────────────────────────────────────────
-export interface Product {
-  product_id: number;
-  product_name: string;
-  product_description?: string;
-  price: number;
-  is_available: boolean;
-  shelf_life?: string;
-  image: string;
-}
+
 
 // ─── BOM ─────────────────────────────────────────────────────────────────────
 export interface BOMEntry {
@@ -38,6 +29,35 @@ export interface BOMEntry {
   quantity_required: number;
   product?: Product;
   inventory?: InventoryItem;
+}
+
+
+
+// ─── Rider ───────────────────────────────────────────────────────────────────
+export interface Rider {
+  rider_id: number;
+  rider_name: string;
+  rider_contact_num?: string;
+  current_location?: string;
+}
+
+// ─── Order ───────────────────────────────────────────────────────────────────
+// index.ts
+export type PaymentMethod = "Cash" | "GCash";
+export type OrderStatus = "Pending" | "Confirmed" | "Baking" | "Out for Delivery" | "For Pickup" | "Completed" | "Cancelled";
+
+export interface Order {
+  order_id: number;
+  customer_id: string;
+  fulfillment_id: number;
+  order_time: string;
+  total_amount: number;
+  ord_f_type: string;
+  payment_method: PaymentMethod;
+  order_status: OrderStatus;
+  customer?: Customer;
+  fulfillment?: Fulfillment;
+  cart_items?: CartOrderLineItem[];
 }
 
 // ─── Fulfillment ─────────────────────────────────────────────────────────────
@@ -65,32 +85,16 @@ export interface PickUp {
   preferred_time?: string;
   pick_up_location?: string;
 }
-
-// ─── Rider ───────────────────────────────────────────────────────────────────
-export interface Rider {
-  rider_id: number;
-  rider_name: string;
-  rider_contact_num?: string;
-  current_location?: string;
-}
-
-// ─── Order ───────────────────────────────────────────────────────────────────
-// index.ts
-export type PaymentMethod = "Cash" | "GCash";
-export type OrderStatus = "Pending" | "Confirmed" | "Baking" | "Out for Delivery" | "For Pickup" | "Completed" | "Cancelled";
-
-export interface Order {
-  order_id: number;
-  customer_id: string;
-  fulfillment_id: number;
-  order_time: string;
-  total_amount: number;
-  payment_method: PaymentMethod;
-  order_status: OrderStatus;
-  customer?: Customer;
-  fulfillment?: Fulfillment;
-  cart_items?: CartOrderLineItem[];
-  invoice?: Invoice;
+// ─── Customer ────────────────────────────────────────────────────────────────
+export interface Customer {
+  cust_id: string;               // UUID from Supabase auth
+  cust_firstname: string;
+  cust_lastname: string;
+  cust_middlename?: string | null;
+  cust_email: string;
+  cust_social_provider?: string | null;  // "google" | "facebook"
+  cust_cont_no?: string | null;
+  cust_cd: string;               // datetime ISO string (auto-set by DB)
 }
 
 // ─── Cart / Order Line Item ──────────────────────────────────────────────────
@@ -102,12 +106,15 @@ export interface CartOrderLineItem {
   product?: Product;
 }
 
-// ─── Invoice ─────────────────────────────────────────────────────────────────
-export interface Invoice {
-  invoice_id: number;
-  order_id: number;
-  invoice_date: string;
-  order?: Order;
+// ─── Product ─────────────────────────────────────────────────────────────────
+export interface Product {
+  product_id: number;
+  product_name: string;
+  product_description?: string;
+  price: number;
+  is_available: boolean;
+  shelf_life?: string;
+  image: string;
 }
 
 // ─── Reports / Aggregates ────────────────────────────────────────────────────

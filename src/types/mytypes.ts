@@ -39,6 +39,8 @@ export interface Product {
   prod_desc?: string;
   prod_price: number;
   prod_available: boolean;
+  prod_sl: string;
+  prod_image_url: string;
 }
 
 
@@ -83,6 +85,7 @@ export interface Rider {
 }
 
 // ─── Order ───────────────────────────────────────────────────────────────────
+// mytypes.ts
 export type PaymentMethod = "Cash" | "GCash";
 export type OrderStatus = "Pending"| "Confirmed"| "Baking"| "Out for Delivery"| "For Pickup"| "Completed"| "Cancelled";
 

@@ -4,28 +4,38 @@ import { useState } from "react";
 import { useFetch } from "@/hooks/useFetch";
 import { ordersApi } from "@/lib/api";
 import Link from "next/link";
-import type { OrderStatus } from "@/types/mytypes";
+import type { OrderStatus, Order } from "@/types";
 
-const STATUSES: OrderStatus[] = ["Pending", "Confirmed", "Baking", "Out for Delivery", "For Pickup", "Completed", "Cancelled"];
+// Backend statuses only — matches app/model/order.py
+const STATUSES: OrderStatus[] = [
+  "Pending",
+  "Preparing",
+  "Out for Delivery",
+  "Completed",
+  "Cancelled",
+];
 
-const statusBadge: Record<OrderStatus, string> = {
-  Pending:           "badge-pending",
-  Confirmed:         "badge-confirmed",
-  Baking:            "badge-baking",
-  "Out for Delivery":"badge-delivery",
-  "For Pickup":      "badge-pickup",
-  Completed:         "badge-completed",
-  Cancelled:         "badge-cancelled",
+const statusBadge: Record<OrderStatus, { bg: string; color: string }> = {
+  Pending:            { bg: "#fef9c3", color: "#854d0e" },
+  Preparing:          { bg: "#dbeafe", color: "#1e3a8a" },
+  "Out for Delivery": { bg: "#e0f2fe", color: "#0c4a6e" },
+  Completed:          { bg: "#dcfce7", color: "#14532d" },
+  Cancelled:          { bg: "#fee2e2", color: "#7f1d1d" },
 };
 
 export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [page, setPage] = useState(1);
 
-  const { data, loading, error, refetch } = useFetch(
-    () => ordersApi.list(page, 20, statusFilter || undefined),
+  // Backend GET /orders returns List[Order] (not paginated), but api.ts wraps with
+  // PaginatedResponse shape. Accept both to be safe.
+  const { data: raw, loading, error, refetch } = useFetch<Order[] | { data: Order[]; total: number }>(
+    () => ordersApi.list(page, 20, statusFilter || undefined) as unknown as Promise<Order[] | { data: Order[]; total: number }>,
     [page, statusFilter]
   );
+
+  const orders: Order[] = Array.isArray(raw) ? raw : (raw as { data: Order[] } | null)?.data ?? [];
+  const total: number = Array.isArray(raw) ? raw.length : (raw as { total: number } | null)?.total ?? 0;
 
   return (
     <div className="page-body">
@@ -34,7 +44,7 @@ export default function OrdersPage() {
         <Link href="/orders/new" className="btn btn-primary">+ New Order</Link>
       </div>
 
-      {/* Filters */}
+      {/* Status filter pills */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
         <button
           className={`btn ${statusFilter === "" ? "btn-primary" : "btn-secondary"}`}
@@ -56,7 +66,7 @@ export default function OrdersPage() {
       <div className="card">
         {loading && <div className="spinner" />}
         {error && <p style={{ color: "red" }}>Error: {error}</p>}
-        {!loading && data && (
+        {!loading && (
           <>
             <div className="table-wrap">
               <table>
@@ -73,7 +83,7 @@ export default function OrdersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.data.length === 0 ? (
+                  {orders.length === 0 ? (
                     <tr>
                       <td colSpan={8}>
                         <div className="empty-state">
@@ -82,62 +92,74 @@ export default function OrdersPage() {
                       </td>
                     </tr>
                   ) : (
-                    data.data.map((order) => (
-                      <tr key={order.order_id}>
-                        <td style={{ fontWeight: 600 }}>#{order.order_id}</td>
-                        <td>
-                          {order.customer
-                            ? `${order.customer.given_name} ${order.customer.last_name}`
-                            : `Customer #${order.customer_id}`}
-                        </td>
-                        <td style={{ fontSize: 13, color: "#6b6f8a" }}>
-                          {new Date(order.order_time).toLocaleString("en-PH", {
-                            month: "short", day: "numeric",
-                            hour: "2-digit", minute: "2-digit",
-                          })}
-                        </td>
-                        <td>{order.fulfillment?.fulfillment_type ?? "—"}</td>
-                        <td>{order.payment_method}</td>
-                        <td style={{ fontWeight: 600 }}>
-                          ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                        </td>
-                        <td>
-                          <span className={`badge ${statusBadge[order.order_status]}`}>
-                            {order.order_status}
-                          </span>
-                        </td>
-                        <td>
-                          <Link
-                            href={`/orders/${order.order_id}`}
-                            style={{ color: "#c8883a", fontSize: 13, fontWeight: 600 }}
-                          >
-                            View →
-                          </Link>
-                        </td>
-                      </tr>
-                    ))
+                    orders.map((order) => {
+                      const badge = statusBadge[order.order_status] ?? { bg: "#f3f4f6", color: "#374151" };
+                      return (
+                        <tr key={order.ord_id}>
+                          <td style={{ fontWeight: 600 }}>#{order.ord_id}</td>
+                          <td>
+                            {order.customer
+                              ? `${order.customer.cust_firstname} ${order.customer.cust_lastname}`
+                              : `Customer #${String(order.cust_id).slice(0, 8)}`}
+                          </td>
+                          <td style={{ fontSize: 13, color: "#6b6f8a" }}>
+                            {new Date(order.ord_time).toLocaleString("en-PH", {
+                              month: "short", day: "numeric",
+                              hour: "2-digit", minute: "2-digit",
+                            })}
+                          </td>
+                          <td>{order.fulfillment?.fulfillment_type ?? order.ord_f_type ?? "—"}</td>
+                          <td>{order.ord_pay_meth}</td>
+                          <td style={{ fontWeight: 600 }}>
+                            ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                          </td>
+                          <td>
+                            <span
+                              className="badge"
+                              style={{
+                                fontSize: 11,
+                                padding: "3px 10px",
+                                background: badge.bg,
+                                color: badge.color,
+                                fontWeight: 600,
+                              }}
+                            >
+                              {order.order_status}
+                            </span>
+                          </td>
+                          <td>
+                            <Link
+                              href={`/orders/${order.ord_id}`}
+                              style={{ color: "#c8883a", fontSize: 13, fontWeight: 600 }}
+                            >
+                              View →
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
 
             {/* Pagination */}
-            {data.total > 20 && (
+            {total > 20 && (
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
                 <button
                   className="btn btn-secondary"
                   disabled={page === 1}
-                  onClick={() => setPage(p => p - 1)}
+                  onClick={() => setPage((p) => p - 1)}
                 >
                   ← Prev
                 </button>
                 <span style={{ lineHeight: "36px", fontSize: 13, color: "#6b6f8a" }}>
-                  Page {page} of {Math.ceil(data.total / 20)}
+                  Page {page} of {Math.ceil(total / 20)}
                 </span>
                 <button
                   className="btn btn-secondary"
-                  disabled={page * 20 >= data.total}
-                  onClick={() => setPage(p => p + 1)}
+                  disabled={page * 20 >= total}
+                  onClick={() => setPage((p) => p + 1)}
                 >
                   Next →
                 </button>
