@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 
 const PUBLIC_PATHS = [
   "/auth/login",
+  "/auth/callback-loading",  // ← add this
 ];
 
 export function middleware(request: NextRequest) {
@@ -29,7 +30,7 @@ export function middleware(request: NextRequest) {
 
   // 2. If logged in, don't let them visit public auth pages (From MainPanel)
   if (isPublic && hasSession) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    // return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return NextResponse.next();

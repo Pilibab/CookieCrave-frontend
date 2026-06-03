@@ -27,7 +27,9 @@ export default function AuthCallbackLoading() {
 
                     // 2. Call your clean API wrapper (No manual fetch needed!)
                     const data = await authApi.me();
-                    
+                    console.log("Role received:", data.user.role);
+                    console.log("Redirecting to:", data.user.role === "admin" ? "/dashboard" : "/customer-ui");
+
                     // 3. Route dynamically based on the role the backend returned
                     if (data.user.role === "admin") {
                         console.log("Admin logged in, heading to dashboard");
