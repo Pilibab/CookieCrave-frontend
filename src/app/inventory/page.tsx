@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useFetch } from "@/hooks/useFetch";
-import { inventoryApi, UnitType } from "@/lib/api";
-import type { InventoryItem } from "@/types/mytypes";
+import { inventoryApi} from "@/lib/api";
+import type { InventoryItem, UnitType } from "@/types/mytypes";
 
 const UOM_OPTIONS: UnitType[] = ["pcs", "ml", "g", "kg"];
 const FILTERS = ["All", "OK", "Low", "Critical"];
