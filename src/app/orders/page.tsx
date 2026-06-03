@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useFetch } from "@/hooks/useFetch";
 import { ordersApi, bomApi, inventoryApi } from "@/lib/api";
 import type { Order, BOMEntry, OrderStatus } from "@/types/mytypes";
+// Import Link from Next.js navigation
+import Link from "next/link";
 
 const STATUS_OPTIONS: OrderStatus[] = [
   "Pending",
@@ -24,7 +26,7 @@ const STATUSES_REQUIRING_BOM: OrderStatus[] = [
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  Pending:            { bg: "rgba(254,243,199,0.12)", text: "#fef08a",  border: "#fef08a22" },
+  Pending:             { bg: "rgba(254,243,199,0.12)", text: "#fef08a",  border: "#fef08a22" },
   Confirmed:          { bg: "rgba(220,252,231,0.10)", text: "#86efac",  border: "#86efac22" },
   Baking:             { bg: "rgba(254,215,170,0.12)", text: "#fdba74",  border: "#fdba7422" },
   "Out for Delivery": { bg: "rgba(186,230,253,0.12)", text: "#7dd3fc",  border: "#7dd3fc22" },
@@ -36,10 +38,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }
 export default function OrdersPage() {
   const { data: orders, loading, error, refetch } = useFetch<Order[]>(ordersApi.list);
 
-  const [updatingId, setUpdatingId]       = useState<number | null>(null);
-  const [deductionLog, setDeductionLog]   = useState<Record<number, string>>({});
-  const [deductError, setDeductError]     = useState<Record<number, string>>({});
-  const [validationError, setValidationError] = useState<Record<number, string>>({});
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
 
   const validateBOM = async (order: Order): Promise<number[]> => {
     const productIds: number[] = Array.isArray((order as any).prod_ids)
@@ -73,19 +72,13 @@ export default function OrdersPage() {
   ) => {
     if (updatingId === orderId) return;
 
-    setValidationError((prev) => ({ ...prev, [orderId]: "" }));
-    setDeductError((prev) => ({ ...prev, [orderId]: "" }));
-
     try {
       setUpdatingId(orderId);
 
       if (STATUSES_REQUIRING_BOM.includes(nextStatus)) {
         const missingBOM = await validateBOM(currentOrder);
         if (missingBOM.length > 0) {
-          setValidationError((prev) => ({
-            ...prev,
-            [orderId]: `Cannot move to "${nextStatus}" — product${missingBOM.length > 1 ? "s" : ""} #${missingBOM.join(", #")} ${missingBOM.length > 1 ? "have" : "has"} no BOM configured.`,
-          }));
+          alert(`Cannot move to "${nextStatus}" — product${missingBOM.length > 1 ? "s" : ""} #${missingBOM.join(", #")} ${missingBOM.length > 1 ? "have" : "has"} no BOM configured.`);
           return;
         }
       }
@@ -97,13 +90,12 @@ export default function OrdersPage() {
       if (nextStatus === "Completed" && currentOrder.order_status !== "Completed") {
         try {
           await inventoryApi.deductByOrder(orderId);
-          setDeductionLog((prev) => ({ ...prev, [orderId]: "Stock deducted" }));
         } catch (deductErr: any) {
           const msg =
             deductErr?.detail ??
             deductErr?.message ??
             "Deduction failed — check backend logs";
-          setDeductError((prev) => ({ ...prev, [orderId]: msg }));
+          alert(msg);
         }
       }
 
@@ -158,9 +150,7 @@ export default function OrdersPage() {
                     <th style={thStyle}>Order ID</th>
                     <th style={thStyle}>Customer</th>
                     <th style={thStyle}>Amount</th>
-                    <th style={thStyle}>Type</th>
                     <th style={thStyle}>Current Status</th>
-                    <th style={thStyle}>Inventory / BOM</th>
                     <th style={{ ...thStyle, textAlign: "right" }}>Update Status</th>
                   </tr>
                 </thead>
@@ -168,51 +158,42 @@ export default function OrdersPage() {
                   {orders?.map((ord) => {
                     const orderId    = ord.ord_id;
                     const isUpdating = updatingId === orderId;
-                    const log        = deductionLog[orderId];
-                    const deductErr  = deductError[orderId];
-                    const bomErr     = validationError[orderId];
+                    const detailUrl  = `/orders/${orderId}`;
 
                     return (
-                      <tr key={orderId} style={tableRowStyle}>
-
-                        <td style={{ ...tdStyle, fontWeight: 700, color: "#C8883A" }}>
-                          #{orderId}
-                        </td>
-
-                        <td style={{ ...tdStyle, color: "#FFFFFF" }}>
-                          {ord.cust_id ?? "—"}
-                        </td>
-
-                        <td style={{ ...tdStyle, color: "#FFFFFF" }}>
-                          ₱{(ord.total_amount ?? 0).toLocaleString()}
-                        </td>
-
-                        <td style={{ ...tdStyle, color: "#94a3b8", fontSize: "12px" }}>
-                          {(ord as any).ord_f_type ?? "—"}
-                        </td>
-
+                      <tr key={orderId} style={tableRowStyle} className="console-row">
+                        
+                        {/* Order ID Link */}
                         <td style={tdStyle}>
-                          <span style={statusStyle(ord.order_status ?? "Pending")}>
-                            {ord.order_status ?? "Pending"}
-                          </span>
+                          <Link href={detailUrl} style={{ ...rowLinkStyle, fontWeight: 700, color: "#C8883A" }}>
+                            #{orderId}
+                          </Link>
                         </td>
 
-                        <td style={{ ...tdStyle, fontSize: "11px", maxWidth: "280px" }}>
-                          {isUpdating ? (
-                            <span style={{ color: "#64748b" }}>Validating…</span>
-                          ) : bomErr ? (
-                            <span style={{ color: "#fde68a" }}>⚠ {bomErr}</span>
-                          ) : deductErr ? (
-                            <span style={{ color: "#fca5a5" }}>✗ {deductErr}</span>
-                          ) : log ? (
-                            <span style={{ color: "#bbf7d0" }}>✓ {log}</span>
-                          ) : ord.order_status === "Completed" ? (
-                            <span style={{ color: "#64748b", fontStyle: "italic" }}>deducted</span>
-                          ) : (
-                            "—"
-                          )}
+                        {/* Customer Link */}
+                        <td style={tdStyle}>
+                          <Link href={detailUrl} style={{ ...rowLinkStyle, color: "#FFFFFF" }}>
+                            {ord.cust_id ?? "—"}
+                          </Link>
                         </td>
 
+                        {/* Amount Link */}
+                        <td style={tdStyle}>
+                          <Link href={detailUrl} style={{ ...rowLinkStyle, color: "#FFFFFF" }}>
+                            ₱{(ord.total_amount ?? 0).toLocaleString()}
+                          </Link>
+                        </td>
+
+                        {/* Status Badge Link */}
+                        <td style={tdStyle}>
+                          <Link href={detailUrl} style={rowLinkStyle}>
+                            <span style={statusStyle(ord.order_status ?? "Pending")}>
+                              {ord.order_status ?? "Pending"}
+                            </span>
+                          </Link>
+                        </td>
+
+                        {/* Action Dropdown Control (Kept normal so clicks do not trigger navigation) */}
                         <td style={{ ...tdStyle, textAlign: "right" }}>
                           <select
                             style={{
@@ -270,7 +251,18 @@ const tableStyle: React.CSSProperties = { width: "100%", borderCollapse: "collap
 const tableHeaderRowStyle: React.CSSProperties = { borderBottom: "1px solid rgba(255,255,255,0.08)" };
 const thStyle: React.CSSProperties = { padding: "10px 12px", fontSize: "10px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" };
 const tableRowStyle: React.CSSProperties = { borderBottom: "1px solid rgba(255,255,255,0.03)" };
-const tdStyle: React.CSSProperties = { padding: "14px 12px", fontSize: "13px", color: "#cbd5e1" };
+const tdStyle: React.CSSProperties = { padding: 0, fontSize: "13px", color: "#cbd5e1" }; // Reset padding to 0 so the Link element can handle fill hit areas
 const emptyStateStyle: React.CSSProperties = { padding: "40px", textAlign: "center", color: "#64748b", fontSize: "13px", fontStyle: "italic" };
 const statusMessageStyle: React.CSSProperties = { textAlign: "center", padding: "32px 16px", fontSize: "13px", color: "#64748b" };
 const selectStyle: React.CSSProperties = { padding: "7px 12px", borderRadius: "4px", border: "1px solid rgba(255,255,255,0.1)", backgroundColor: "rgba(8,6,5,0.8)", fontSize: "12px", color: "#FFFFFF", outline: "none", boxSizing: "border-box", cursor: "pointer", minWidth: "160px" };
+
+// New Link component layout styling
+const rowLinkStyle: React.CSSProperties = {
+  display: "block",
+  padding: "14px 12px",
+  textDecoration: "none",
+  color: "inherit",
+  cursor: "pointer",
+  width: "100%",
+  boxSizing: "border-box"
+};

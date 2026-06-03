@@ -7,13 +7,13 @@ import type { Product, BOMEntry, InventoryItem } from "@/types/mytypes";
 
 // ─── BOM Form Modal ───────────────────────────────────────────────────────────
 function BOMForm({
-  productId,
+  product,
   inventory,
   existingEntries,
   onClose,
   onSaved,
 }: {
-  productId: number;
+  product: Product;
   inventory: InventoryItem[];
   existingEntries: BOMEntry[];
   onClose: () => void;
@@ -33,7 +33,7 @@ function BOMForm({
     setSaving(true);
     try {
       await bomApi.create({
-        prod_id: productId,
+        prod_id: product.prod_id,
         ingredients: [{ inv_id: Number(selectedInvId), bom_quan_req: quantityReq }],
       });
       onSaved();
@@ -71,7 +71,12 @@ function BOMForm({
     <div style={modalOverlayStyle}>
       <div style={{ ...modalStyle, maxWidth: "520px" }}>
         <div style={modalHeaderStyle}>
-          <h2 style={modalTitleStyle}>BOM — Product #{productId}</h2>
+          <div>
+            <h2 style={modalTitleStyle}>Bill of Materials</h2>
+            <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#64748b" }}>
+              {product.prod_name} · Product #{product.prod_id}
+            </p>
+          </div>
           <button style={modalCloseBtnStyle} onClick={onClose}>✕</button>
         </div>
 
@@ -82,8 +87,8 @@ function BOMForm({
               {existingEntries.map((entry) => {
                 const invItem = inventory.find((i) => i.inv_id === entry.inv_id);
                 return (
-                  <div key={entry.inv_id} style={bomRowStyle}>
-                    <span style={{ color: "#FFFFFF", fontSize: "13px" }}>
+                  <div key={entry.bom_id} style={bomRowStyle}>
+                    <span style={{ color: "#FFFFFF", fontSize: "13px", flex: 1 }}>
                       {invItem?.inv_ing_name ?? `Ingredient #${entry.inv_id}`}
                     </span>
                     <span style={{ color: "#94a3b8", fontSize: "12px" }}>
@@ -99,6 +104,14 @@ function BOMForm({
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {existingEntries.length === 0 && (
+          <div style={{ padding: "12px", backgroundColor: "rgba(255,255,255,0.03)", borderRadius: "4px", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <p style={{ margin: 0, fontSize: "12px", color: "#64748b", fontStyle: "italic" }}>
+              No ingredients added yet. Add ingredients below.
+            </p>
           </div>
         )}
 
@@ -179,17 +192,17 @@ function ProductForm({
 }: {
   initial: Product | null;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (newProduct?: Product) => void;
 }) {
   const isEditing = initial !== null;
 
-  const [name, setName] = useState(initial?.prod_name ?? "");
+  const [name, setName]   = useState(initial?.prod_name ?? "");
   const [price, setPrice] = useState<number>(initial?.prod_price ?? 0);
-  const [desc, setDesc] = useState(initial?.prod_desc ?? "");
-  const [sl, setSl] = useState(initial?.prod_sl ?? "");
+  const [desc, setDesc]   = useState(initial?.prod_desc ?? "");
+  const [sl, setSl]       = useState(initial?.prod_sl ?? "");
 
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(initial?.prod_image_url ?? null);
+  const [imageFile, setImageFile]         = useState<File | null>(null);
+  const [imagePreview, setImagePreview]   = useState<string | null>(initial?.prod_image_url ?? null);
   const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done" | "error">("idle");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
@@ -220,20 +233,21 @@ function ProductForm({
       }
 
       const payload = {
-        prod_name: name,
+        prod_name:  name,
         prod_price: price,
-        prod_desc: desc,
-        prod_sl: sl,
+        prod_desc:  desc,
+        prod_sl:    sl,
         ...(uploadedImageUrl ? { prod_image_url: uploadedImageUrl } : {}),
       };
 
       if (isEditing && initial) {
         await productsApi.update(initial.prod_id, payload);
+        onSaved();
       } else {
-        await productsApi.create(payload);
+        const created = await productsApi.create(payload);
+        onSaved(created); // pass new product back so BOM modal can open
       }
 
-      onSaved();
       onClose();
     } catch (err: any) {
       let msg: string;
@@ -277,8 +291,8 @@ function ProductForm({
         </div>
 
         <div style={fieldGroupStyle}>
-          <label style={labelStyle}>Shelf Life</label>
-          <input style={inputStyle} value={sl} onChange={(e) => setSl(e.target.value)} placeholder="e.g. 3 days" />
+          <label style={labelStyle}>Shelf Life (date)</label>
+          <input style={inputStyle} type="date" value={sl} onChange={(e) => setSl(e.target.value)} />
         </div>
 
         <div style={fieldGroupStyle}>
@@ -302,7 +316,7 @@ function ProductForm({
         <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "8px" }}>
           <button style={cancelBtnStyle} onClick={onClose} disabled={saving}>Cancel</button>
           <button style={saveBtnStyle} onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : isEditing ? "Save Changes" : "Add Product"}
+            {saving ? "Saving…" : isEditing ? "Save Changes" : "Add Product & Set BOM →"}
           </button>
         </div>
       </div>
@@ -329,6 +343,15 @@ export default function ProductsPage() {
   const handleBomSaved = () => {
     refetchBom();
     refetch();
+  };
+
+  // Called when ProductForm saves successfully
+  // If it's a new product, newProduct is returned and BOM modal opens automatically
+  const handleProductSaved = (newProduct?: Product) => {
+    refetch();
+    if (newProduct) {
+      setBomProduct(newProduct); // auto-open BOM for the newly created product
+    }
   };
 
   return (
@@ -381,7 +404,7 @@ export default function ProductsPage() {
                       <span style={available ? availableBadgeStyle : unavailableBadgeStyle}>
                         {available ? "✓ Available" : "✗ Unavailable"}
                       </span>
-                      <button style={editBtnStyle} onClick={() => { setBomProduct(product); }}>
+                      <button style={editBtnStyle} onClick={() => setBomProduct(product)}>
                         BOM
                       </button>
                       <button style={editBtnStyle} onClick={() => { setEditing(product); setShowForm(true); }}>
@@ -419,7 +442,7 @@ export default function ProductsPage() {
                           const required = entry.bom_quan_req ?? 0;
                           const hasStock = invItem && (invItem.inv_stock ?? 0) >= required;
                           return (
-                            <li key={entry.inv_id} style={{ ...ingredientItemStyle, color: hasStock ? "#bbf7d0" : "#fca5a5" }}>
+                            <li key={entry.bom_id} style={{ ...ingredientItemStyle, color: hasStock ? "#bbf7d0" : "#fca5a5" }}>
                               <span style={{ marginRight: "4px" }}>{hasStock ? "●" : "○"}</span>
                               {invItem?.inv_ing_name ?? `Ingredient #${entry.inv_id}`}
                               {" — "}
@@ -441,7 +464,15 @@ export default function ProductsPage() {
                   )}
 
                   {bomEntries.length === 0 && (
-                    <div style={noBomStyle}>No BOM configured — click BOM to add ingredients.</div>
+                    <div style={noBomStyle}>
+                      No BOM configured —{" "}
+                      <span
+                        style={{ color: "#C8883A", cursor: "pointer", textDecoration: "underline" }}
+                        onClick={() => setBomProduct(product)}
+                      >
+                        click here to add ingredients
+                      </span>
+                    </div>
                   )}
 
                   <div style={{
@@ -475,14 +506,14 @@ export default function ProductsPage() {
       {showForm && (
         <ProductForm
           initial={editing}
-          onClose={() => setShowForm(false)}
-          onSaved={refetch}
+          onClose={() => { setShowForm(false); setEditing(null); }}
+          onSaved={handleProductSaved}
         />
       )}
 
       {bomProduct && (
         <BOMForm
-          productId={bomProduct.prod_id}
+          product={bomProduct}
           inventory={inventory ?? []}
           existingEntries={(allBom ?? []).filter((b) => b.prod_id === bomProduct.prod_id)}
           onClose={() => setBomProduct(null)}

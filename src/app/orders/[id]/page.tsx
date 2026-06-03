@@ -16,34 +16,59 @@ export default function OrderDetailPage() {
 
   // ─── SINGLE UNIFIED FETCH CALL ─────────────────────────────────────────────
   const { data: pageData, loading, error, refetch } = useFetch(async () => {
-    // 1. Fetch the core order details
+    // 1. Fetch the core order details (Crucial - if this fails, throw)
     const orderData = await ordersApi.get(orderId);
+    if (!orderData) throw new Error("Core order record not found");
 
-    // 2. Fetch basic related collections concurrently
+    // 2. Fetch basic related collections concurrently with individual error safety shields
     const [customerData, fulfillmentData, cartItems] = await Promise.all([
-      customersApi.get(String(orderData.cust_id)),
-      fulfillmentApi.get(orderData.fulfillment_id),
-      cartApi.getByOrder(orderData.ord_id),
+      // If customer is missing or deleted, return null instead of crashing the page
+      customersApi.get(String(orderData.cust_id))
+        .catch((err) => {
+          console.warn(`Customer ID ${orderData.cust_id} could not be resolved:`, err);
+          return null;
+        }),
+      
+      fulfillmentApi.get(orderData.fulfillment_id)
+        .catch((err) => {
+          console.warn(`Fulfillment ID ${orderData.fulfillment_id} could not be resolved:`, err);
+          return null;
+        }),
+      
+      cartApi.getByOrder(orderData.ord_id)
+        .catch((err) => {
+          console.warn(`Cart manifest items for Order ${orderData.ord_id} failed to load:`, err);
+          return []; // Fallback to an empty list so the application can continue mapping
+        }),
     ]);
 
     // 3. Fetch specific sub-fulfillment records conditionally based on type
     let deliveryData = null;
     let pickupData = null;
 
-    if (fulfillmentData.fulfillment_type === "Delivery") {
-      deliveryData = await deliveryApi.get(orderData.fulfillment_id);
-    } else if (fulfillmentData.fulfillment_type === "Pick_Up") {
-      pickupData = await pickupApi.get(orderData.fulfillment_id);
+    if (fulfillmentData?.fulfillment_type === "Delivery") {
+      try {
+        deliveryData = await deliveryApi.get(orderData.fulfillment_id);
+      } catch (err) {
+        console.error("Failed to load sub-fulfillment delivery log details:", err);
+      }
+    } else if (fulfillmentData?.fulfillment_type === "Pick_Up") {
+      try {
+        pickupData = await pickupApi.get(orderData.fulfillment_id);
+      } catch (err) {
+        console.error("Failed to load sub-fulfillment pickup scheduling details:", err);
+      }
     }
 
     // 4. Hydrate the cart line items with product descriptions concurrently
+    const safeCartItems = Array.isArray(cartItems) ? cartItems : [];
     const hydratedCart = await Promise.all(
-      cartItems.map(async (item) => {
+      safeCartItems.map(async (item) => {
         try {
           const productInfo = await productsApi.get(item.prod_id);
           return {
             ...item,
-            product: productInfo, // Injected product object safely inside the array loop
+            product: productInfo,
           };
         } catch (err) {
           console.error(`Failed to hydrate product info for ID ${item.prod_id}:`, err);
@@ -52,7 +77,7 @@ export default function OrderDetailPage() {
       })
     );
 
-    // Return the single consolidated state payload
+    // Return the single consolidated state payload safely
     return {
       order: orderData,
       customer: customerData,
@@ -69,7 +94,7 @@ export default function OrderDetailPage() {
 
   const handleStatusChange = async (status: OrderStatus) => {
     await updateStatus(status);
-    refetch(); // This cleanly re-runs the entire aggregated data tree
+    refetch(); 
   };
 
   if (loading) return <div className="page-body"><div className="spinner" /></div>;
@@ -85,9 +110,6 @@ export default function OrderDetailPage() {
           <Link href="/orders" style={{ color: "#6b6f8a", fontSize: 14 }}>← Orders</Link>
           <h1 className="page-title">Order #{order.ord_id}</h1>
         </div>
-        {/* <span style={{ fontSize: 13, color: "#6b6f8a" }}>
-          Invoice: {order.invoice ? `#${order.invoice.invoice_id}` : "Pending"}     no invoice
-        </span> */}
       </div>
 
       {/* Status stepper */}
@@ -148,9 +170,7 @@ export default function OrderDetailPage() {
               <dt>Contact</dt>
               <dd>{customer.cust_cont_no ?? "—"}</dd>
             </dl>
-          ) : <p style={{ color: "#6b6f8a" }}>
-            {/* {should customer be null then dont display info }  */}
-            No info </p>}
+          ) : <p style={{ color: "#6b6f8a" }}>No info</p>}
         </div>
 
         {/* Fulfillment info */}
@@ -159,7 +179,7 @@ export default function OrderDetailPage() {
           <dl style={dl}>
             <dt>Type</dt>
             <dd>{fulfillment?.fulfillment_type ?? "—"}</dd>
-            {fulfillment?.fulfillment_type  === "Delivery" && delivery && (
+            {fulfillment?.fulfillment_type === "Delivery" && delivery && (
               <>
                 <dt>Address</dt>
                 <dd>{delivery.address}</dd>
@@ -171,7 +191,7 @@ export default function OrderDetailPage() {
                 )}
               </>
             )}
-            {fulfillment?.fulfillment_type  === "Pick_Up" && pickup && (
+            {fulfillment?.fulfillment_type === "Pick_Up" && pickup && (
               <>
                 <dt>Preferred Time</dt>
                 <dd>{pickup.preferred_time ?? "—"}</dd>
@@ -202,32 +222,30 @@ export default function OrderDetailPage() {
                 <th>Subtotal</th>
               </tr>
             </thead>
-              <tbody>
-                {(cart ?? []).map((item) => {
-                  // 1. Safely extract values with safe numeric fallbacks to satisfy TypeScript
-                  const price = item.product?.prod_price ?? 0;
-                  const quantity = item.cart_quan ?? 0;
-                  const subtotal = price * quantity;
+            <tbody>
+              {(cart ?? []).map((item) => {
+                const price = item.product?.prod_price ?? 0;
+                const quantity = item.cart_quan ?? 0;
+                const subtotal = price * quantity;
 
-                  return (
-                    <tr key={item.prod_id}>
-                      {/* Access the hydrated product object properties safely */}
-                      <td>{item.product?.prod_name ?? `Product #${item.prod_id}`}</td>
-                      <td>₱{price.toFixed(2)}</td>
-                      <td>{quantity}</td>
-                      <td style={{ fontWeight: 600 }}>
-                        ₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  );
-                })}
-                <tr>
-                  <td colSpan={3} style={{ textAlign: "right", fontWeight: 700 }}>Total</td>
-                  <td style={{ fontWeight: 700, fontSize: 16 }}>
-                    ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                  </td>
-                </tr>
-              </tbody>
+                return (
+                  <tr key={item.prod_id}>
+                    <td>{item.product?.prod_name ?? `Product #${item.prod_id}`}</td>
+                    <td>₱{price.toFixed(2)}</td>
+                    <td>{quantity}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      ₱{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr>
+                <td colSpan={3} style={{ textAlign: "right", fontWeight: 700 }}>Total</td>
+                <td style={{ fontWeight: 700, fontSize: 16 }}>
+                  ₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                </td>
+              </tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -241,55 +259,3 @@ const dl: React.CSSProperties = {
   gap: "6px 12px",
   fontSize: 14,
 };
-
-
-// ! ----------------- SCRATCH------------------
-  // ! retrieve order info 
-  // const { data: order, loading, error, refetch } = useFetch(
-  //   () => ordersApi.get(orderId),
-  //   [orderId]
-  // );
-
-  // const { mutate: updateStatus, loading: updating } = useMutation(
-  //   (status: OrderStatus) => ordersApi.updateStatus(orderId, status)
-  // );
-
-  // const handleStatusChange = async (status: OrderStatus) => {
-  //   await updateStatus(status);
-  //   refetch();
-  // };
-
-  // if (loading) return <div className="page-body"><div className="spinner" /></div>;
-  // if (error || !order) return <div className="page-body"><p style={{ color: "red" }}>Order not found.</p></div>;
-
-  // const currentIdx = STATUS_FLOW.indexOf(order.order_status as OrderStatus);
-
-  // // ! retrieve othe info but shit... dont i have the dashboard adapter? i think its just the same ahh.....
-  // const { data: customer, loading: cust_loading , error: cust_err, refetch: cust_refetch } = useFetch(
-  //   () => customersApi.get(order.cust_id),
-  //   [order.cust_id]
-  // );  
-  // const { data: fulfillment, loading: fullfillment_loading , error: fullfillment_err, refetch: fullfillment_refetch } = useFetch(
-  //   () => fulfillmentApi.get(order.fulfillment_id),
-  //   [order.fulfillment_id]
-  // );
-
-  // const { data: delivery, loading: delievery_loading , error: delievery_err, refetch: delievery_refetch } = useFetch(
-  //   () => deliveryApi.get(order.fulfillment_id),
-  //   [order.fulfillment_id]
-  // );  
-  // const { data: pickup, loading: pickup_loading , error: pickup_err, refetch: pickup_refetch } = useFetch(
-  //   () => pickupApi.get(order.fulfillment_id),
-  //   [order.fulfillment_id]
-  // );
-
-  // const { data: cart, loading: cart_loading , error: cart_err, refetch: cart_refetch } = useFetch(
-  //   () => cartApi.getByOrder(order.ord_id),
-  //   [order.ord_id]
-  // );
-
-  // const { data: product, loading: product_loading , error: product_err, refetch: product_refetch } = useFetch(
-  //   () => productsApp,
-  //   [order.ord_id]
-  // );
-  // If the ID is a number, cast it using String() so TypeScript is happy:
