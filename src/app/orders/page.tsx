@@ -90,7 +90,9 @@ export default function OrdersPage() {
         }
       }
 
-      await ordersApi.update(orderId, { ...currentOrder, order_status: nextStatus });
+      // !!!
+      // await ordersApi.update(orderId, { ...currentOrder, order_status: nextStatus });
+      await ordersApi.updateStatus(orderId, nextStatus);
 
       if (nextStatus === "Completed" && currentOrder.order_status !== "Completed") {
         try {

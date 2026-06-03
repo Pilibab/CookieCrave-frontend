@@ -338,5 +338,5 @@ export const ordersApi = {
         ),
 
   // GET /orders/{order_id}/bill?cust_id={cust_id}
-  getBill: (orderId: number, custId: string) => request(`/orders/${orderId}/bill?cust_id=${custId}`),
+  getBill: (orderId: number) => request(`/orders/${orderId}/bill`),
 };
