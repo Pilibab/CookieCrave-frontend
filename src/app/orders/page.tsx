@@ -83,6 +83,15 @@ export default function OrdersPage() {
         }
       }
 
+            // ← ADDED: deduct stock whenever moving into any BOM-requiring status
+      try {
+        await inventoryApi.deductByOrder(orderId);
+      } catch (deductErr: any) {
+        const msg = deductErr?.detail ?? deductErr?.message ?? "Deduction failed — check backend logs";
+        alert(msg);
+        return; // ← stop status update if deduction fails
+      }
+      
       // !!!
       // await ordersApi.update(orderId, { ...currentOrder, order_status: nextStatus });
       await ordersApi.updateStatus(orderId, nextStatus);
