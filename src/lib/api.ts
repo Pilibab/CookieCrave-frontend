@@ -17,15 +17,27 @@ import {
     Order,
     OrderStatus,
 } from "@/types/mytypes";
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-import { mockProducts } from "@/lib/mockdata";
+import {     
+    mockProducts,
+    mockBOMEntries,
+    mockCartOrderLineItems,
+    mockFulfillments,
+    mockInventory,
+    mockRiders,
+    mockOrders,
+    mockWeeklySummary,
+    mockLowStockItems, 
+} from "@/lib/mockdata";
 
 // Set NEXT_PUBLIC_MOCK=true in .env.local to use mock data 
 const USE_MOCK = process.env.NEXT_PUBLIC_MOCK === "true";
 
+// extract backend url
+const BASE_URL = process.env.NEXT_PUBLIC_API_BACKEND_URL ?? "http://localhost:8000";
 
-// ─── Real API ─────────────────────────────────────────────────────────────────
+
+// *─── Real API ─────────────────────────────────────────────────────────────────
 // Real API inside api.ts
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     // 1. Manually extract the cookie value from the browser string
@@ -38,7 +50,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
     const token = getCookie("sb-access-token");
 
-    const res = await fetch(`${BASE_URL}/api${path}`, {
+    const res = await fetch(`${BASE_URL}${path}`, {
         headers: {
             "Content-Type": "application/json",
             // 2. Explicitly inject the Bearer header so the original backend HTTPBearer() works!
@@ -80,20 +92,22 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     return res.json() as Promise<T>;
 }
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
+// *─── Auth ─────────────────────────────────────────────────────────────────────
 export const authApi = {
     me: () => request<{ user: User }>("/auth/me"),
     logout: () => request("/auth/logout", { method: "POST" }),
-    googleLoginUrl: `${BASE_URL}/api/auth/google`,
+    googleLoginUrl: `${BASE_URL}/auth/google`,
 };
-// ─── Customers ────────────────────────────────────────────────────────────────
-// GET    /api/customers
-// POST   /api/customers
-// GET    /api/customers/{customer_id}
-// PUT    /api/customers/{customer_id}
-// DELETE /api/customers/{customer_id}
+// *─── Customers ────────────────────────────────────────────────────────────────
+// GET    /customers
+// POST   /customers
+// GET    /customers/{customer_id}
+// PUT    /customers/{customer_id}
+// DELETE /customers/{customer_id}
 export const customersApi = {
-    list: () => request<Customer[]>("/customers"),
+    list: () => {
+        request<Customer[]>("/customers")
+    },
 
     get: (id: string) =>
         request<Customer>(`/customers/${id}`),
@@ -113,14 +127,31 @@ export const customersApi = {
     delete: (id: string) => request(`/customers/${id}`, { method: "DELETE" }),
 };
 
-// ─── Products ─────────────────────────────────────────────────────────────────
+// *─── Products ─────────────────────────────────────────────────────────────────
 // POST   /products
 // GET    /products
-// GET    /products/{product_id}
-// PUT    /products/{product_id}
-// DELETE /products/{product_id}
+// GET    /products/{prod_id}
+// PUT    /products/{prod_id}
+// DELETE /products/{prod_id}
 export const productsApi = {
     list: (params?: { availableOnly?: boolean; search?: string }) => {
+
+        // ! mock data for testing
+        if (USE_MOCK) {
+            let results = mockProducts;
+            if (params?.availableOnly) {
+                results = results.filter((p) => p.is_available);
+            }
+            if (params?.search) {
+                const q = params.search.toLowerCase();
+                results = results.filter((p) =>
+                    p.product_name.toLowerCase().includes(q),
+                );
+            }
+            return Promise.resolve(results);
+        }
+
+        // retrieve data from url parameters 
         const searchParams = new URLSearchParams();
 
         if (params?.availableOnly) {
@@ -138,17 +169,42 @@ export const productsApi = {
 
     get: (id: number) =>
         request<Product>(`/products/${id}`),
-    create: (body: Partial<Product>) =>
-        request<Product>("/products", {
-            method: "POST",
-            body: JSON.stringify(body),
-        }),
-    update: (id: number, body: Partial<Product>) =>
-        request<Product>(`/products/${id}`, {
-            method: "PUT",
-            body: JSON.stringify(body),
-        }),
-    delete: (id: number) => request(`/products/${id}`, { method: "DELETE" }),
+    create: (body: Partial<Product>) => {
+        if (USE_MOCK) {
+                const newProduct: Product = {
+                prod_id: Math.max(0, ...mockProducts.map((p) => p.prod_id)) + 1,
+                product_name: body.product_name ?? "Untitled Product",
+                product_description: body.product_description,
+                price: body.price ?? 0,
+                is_available: body.is_available ?? true,
+                shelf_life: body.shelf_life,
+                image: body.image ?? "",
+            };
+            mockProducts.push(newProduct);
+            return Promise.resolve(newProduct);
+            
+        }
+        return request<Product>("/products", { method: "POST", body: JSON.stringify(body) });            
+    },
+    update: (id: number, body: Partial<Product>) => {
+
+        if (USE_MOCK) {
+            const i = mockProducts.findIndex((p) => p.prod_id === id);
+            if (i === -1) return Promise.reject(new Error(`Product ${id} not found`));
+            mockProducts[i] = { ...mockProducts[i], ...body };
+            return Promise.resolve(mockProducts[i]);
+        }
+        return request<Product>(`/products/${id}`, { method: "PUT", body: JSON.stringify(body)});
+    },
+
+    delete: (id: number) => {
+        if (USE_MOCK) {
+            const i = mockProducts.findIndex((p) => p.prod_id === id);
+            if (i !== -1) mockProducts.splice(i, 1);
+            return Promise.resolve();
+        }
+        return request(`/products/${id}`, { method: "DELETE" })
+    }
 };
 
 // ─── BOM (Bill of Materials) ───────────────────────────────────────────────────
@@ -157,7 +213,7 @@ export const productsApi = {
 // GET    /bom/{bom_id}
 // PUT    /bom/{bom_id}
 // DELETE /bom/{bom_id}
-// GET    /bom/product/{product_id}      — ingredients for a product
+// GET    /bom/product/{prod_id}      — ingredients for a product
 // GET    /bom/ingredient/{inventory_id} — products using an ingredient
 
 export const bomApi = {
@@ -189,11 +245,11 @@ export const bomApi = {
 // GET    /cart
 // POST   /cart
 // GET    /cart/order/{order_id}
-// DELETE /cart/order/{order_id}/product/{product_id}
+// DELETE /cart/order/{order_id}/product/{prod_id}
 // POST   /cart/order/{order_id}/bulk
 export const cartApi = {
     list: () => request<CartOrderLineItem[]>("/cart"),
-    add: (body: { order_id: number; product_id: number; quantity: number }) =>
+    add: (body: { order_id: number; prod_id: number; quantity: number }) =>
         request<CartOrderLineItem>("/cart", {
             method: "POST",
             body: JSON.stringify(body),
@@ -208,7 +264,7 @@ export const cartApi = {
         }),
     bulkAdd: (
         orderId: number,
-        items: { product_id: number; quantity: number }[],
+        items: { prod_id: number; quantity: number }[],
     ) =>
         request<CartOrderLineItem[]>(
             `/cart/order/${orderId}/bulk`,
