@@ -1,6 +1,7 @@
 import {
     BOMEntry,
     Rider,
+    Customer,
     Order,
     // OrderStatus,
     PaymentMethod,
@@ -16,6 +17,58 @@ import {
     PaginatedResponse,
     Product,
 } from "@/types"; // verify this resolves — you have both src/types/index.ts and src/types/mytypes.ts
+
+// ─── Customer ───────────────────────────────────────────────────────────────
+export const mockCustomers: Customer[] = [
+    {
+        cust_id: "8f14e45f-ceea-4d5c-b6a1-0dfa8ce7a018",
+        cust_lastname: "Fernandez",
+        cust_firstname: "Liza",
+        cust_email: "liza.fernandez@example.com",
+        cust_cd: "Makati City",
+        cust_social_provider: "google",
+    },
+    {
+        cust_id: "3c59dc04-8d88-4a34-9f60-b78d2e1bc1e8",
+        cust_lastname: "Cruz",
+        cust_firstname: "Paolo",
+        cust_email: "paolo.cruz@example.com",
+        cust_cd: "Quezon City",
+        cust_social_provider: "google",
+    },
+    {
+        cust_id: "a3f390d8-8e4c-4f4c-b3e8-e73b8f3b6e5b",
+        cust_lastname: "Reyes",
+        cust_firstname: "Mia",
+        cust_email: "mia.reyes@example.com",
+        cust_cd: "Quezon City",
+        cust_social_provider: "google",
+    },
+    {
+        cust_id: "5e884898-da28-4770-8926-2ee7dcc8a234",
+        cust_lastname: "Santos",
+        cust_firstname: "Janelle",
+        cust_email: "janelle.santos@example.com",
+        cust_cd: "Manila City",
+        cust_social_provider: "google",
+    },
+    {
+        cust_id: "c1a67e77-2f78-49b0-9c0a-6acb64fa2d18",
+        cust_lastname: "Alvarez",
+        cust_firstname: "Nina",
+        cust_email: "nina.alvarez@example.com",
+        cust_cd: "Quezon City",
+        cust_social_provider: "google",
+    },
+    {
+        cust_id: "9f61e3bd-9ff9-4547-b0d4-1a3e4b1c9ea3",
+        cust_lastname: "Garcia",
+        cust_firstname: "Carlo",
+        cust_email: "carlo.garcia@example.com",
+        cust_cd: "Pasig City",
+        cust_social_provider: "google",
+    },
+];
 
 // ─── prod_id ─────────────────────────────────────────────────────────────────
 export const mockProducts: Product[] = [
