@@ -16,7 +16,7 @@ import {
     WeeklySummary,
     Order,
     OrderStatus,
-} from "@/types/mytypes";
+} from "@/types";
 
 import {     
     mockProducts,
@@ -140,12 +140,12 @@ export const productsApi = {
         if (USE_MOCK) {
             let results = mockProducts;
             if (params?.availableOnly) {
-                results = results.filter((p) => p.is_available);
+                results = results.filter((p) => p.prod_available);
             }
             if (params?.search) {
                 const q = params.search.toLowerCase();
                 results = results.filter((p) =>
-                    p.product_name.toLowerCase().includes(q),
+                    p.prod_name.toLowerCase().includes(q),
                 );
             }
             return Promise.resolve(results);
@@ -173,12 +173,12 @@ export const productsApi = {
         if (USE_MOCK) {
                 const newProduct: Product = {
                 prod_id: Math.max(0, ...mockProducts.map((p) => p.prod_id)) + 1,
-                product_name: body.product_name ?? "Untitled Product",
-                product_description: body.product_description,
-                price: body.price ?? 0,
-                is_available: body.is_available ?? true,
-                shelf_life: body.shelf_life,
-                image: body.image ?? "",
+                prod_name: body.prod_name ?? "Untitled Product",
+                prod_desc: body.prod_desc,
+                prod_price: body.prod_price ?? 0,
+                prod_available: body.prod_available ?? true,
+                prod_sl: body.prod_sl ?? "",
+                prod_image_url: body.prod_image_url ?? "",
             };
             mockProducts.push(newProduct);
             return Promise.resolve(newProduct);
