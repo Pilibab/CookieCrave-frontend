@@ -106,13 +106,13 @@ export const authApi = {
     me: () =>
         USE_MOCK
             ? Promise.resolve({
-                  user: {
-                      id: "mock-user",
-                      email: "demo@cookiecrave.test",
-                      name: "Demo User",
-                      role: "admin" as const,
-                  },
-              })
+                user: {
+                    id: "mock-user",
+                    email: "demo@cookiecrave.test",
+                    name: "Demo User",
+                    role: "admin" as const,
+                },
+            })
             : request<{ user: User }>("/auth/me"),
     logout: () =>
         USE_MOCK
