@@ -186,7 +186,9 @@ Also: `npm run lint` broken — `next lint` removed in Next.js 15.
 
 ---
 
-### 13. Duplicate Customer-Facing UIs (Dead Code)
+### <s>13. Duplicate Customer-Facing UIs (Dead Code)</s>
+**Date fixed:** `9:51 PM Tuesday, September 1, 2026 (GMT+8)`
+**commit hash (fixed at):** `fbee46f549964c399e416e4428415336d15d4351`
 **Location:** `src/app/home-customer/` vs `src/app/customer-ui/`  
 **Impact:** Maintenance burden, confusion, larger bundle
 
